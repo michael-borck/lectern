@@ -3,34 +3,184 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Presentations</title>
+  <title>present — synced slide sharing</title>
   <style>
+    * { box-sizing: border-box; }
     body {
-      background: #111;
+      background: #141416;
       color: #eee;
-      font: 18px/1.6 system-ui, sans-serif;
-      max-width: 40em;
-      margin: 15vh auto;
-      padding: 0 1em;
+      font: 16px/1.5 system-ui, sans-serif;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px 64px;
     }
-    h1 { font-size: 1.6em; }
-    a { color: #6cf; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    ul { list-style: none; padding: 0; }
-    li { margin: 0.4em 0; }
+
+    /* hero */
+    .hero {
+      text-align: center;
+      padding: 14vh 0 8vh;
+    }
+    .hero .logo {
+      font-size: clamp(2.6em, 6vw, 4em);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 0;
+      background: linear-gradient(90deg, #6cf, #b9f);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .hero .tagline {
+      font-size: clamp(1.1em, 2.4vw, 1.45em);
+      color: #ccc;
+      margin: 0.4em 0 0;
+      font-weight: 500;
+    }
+    .hero .blurb {
+      color: #999;
+      max-width: 34em;
+      margin: 1.2em auto 0;
+    }
+    .how {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 2.2em auto 0;
+      max-width: 46em;
+    }
+    .how div {
+      background: #1e1e22;
+      border: 1px solid #2c2c31;
+      border-radius: 10px;
+      padding: 12px 16px;
+      flex: 1;
+      min-width: 180px;
+      font-size: 0.88em;
+      color: #bbb;
+      text-align: left;
+    }
+    .how b {
+      display: block;
+      color: #eee;
+      margin-bottom: 3px;
+    }
+
+    /* deck grid */
+    h2 {
+      font-size: 1.1em;
+      font-weight: 600;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin: 0 0 1.2em;
+    }
+    #decks {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: #1e1e22;
+      border: 1px solid #2c2c31;
+      border-radius: 12px;
+      overflow: hidden;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+    .card:hover {
+      border-color: #4a4a52;
+      transform: translateY(-2px);
+    }
+    .thumb {
+      display: block;
+      aspect-ratio: 16 / 9;
+      background: #000;
+    }
+    .thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .meta { padding: 12px 14px 14px; }
+    .name {
+      font-weight: 600;
+      word-break: break-word;
+    }
+    .count {
+      color: #888;
+      font-size: 0.82em;
+      margin-top: 2px;
+    }
+    .links {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .links a {
+      flex: 1;
+      text-align: center;
+      text-decoration: none;
+      border-radius: 7px;
+      padding: 7px 0;
+      font-size: 0.9em;
+      font-weight: 600;
+    }
+    .watch {
+      background: #2c2c31;
+      color: #eee;
+    }
+    .watch:hover { background: #3a3a41; }
+    .present {
+      background: #b00;
+      color: #fff;
+    }
+    .present:hover { background: #d00; }
     .empty { color: #888; }
   </style>
 </head>
 <body>
-  <h1>Presentations</h1>
-  <ul id="decks"><li class="empty">Loading…</li></ul>
+  <header class="hero">
+    <p class="logo">present</p>
+    <p class="tagline">Synced slide sharing over a plain URL</p>
+    <p class="blurb">
+      No invites, no accounts, no apps. The presenter drives the slides and every
+      screen follows along in real time — pick a talk below to join.
+    </p>
+    <div class="how">
+      <div><b>Watch</b>Open a talk and follow along live as the presenter advances.</div>
+      <div><b>Present</b>Drive the slides yourself — you’ll be asked for the presenter key.</div>
+      <div><b>Anywhere</b>Any laptop, any browser. Share the link, that’s the whole setup.</div>
+    </div>
+  </header>
+
+  <h2>Talks</h2>
+  <div id="decks"><p class="empty">Loading…</p></div>
+
   <script>
     fetch('/decks.json')
       .then((r) => r.json())
       .then((decks) => {
         document.getElementById('decks').innerHTML = decks.length
-          ? decks.map((d) => `<li><a href="/${d}/">${d}</a></li>`).join('')
-          : '<li class="empty">No presentations yet.</li>';
+          ? decks
+              .map(
+                (d) => `
+        <div class="card">
+          <a class="thumb" href="/${d.name}/"><img src="/${d.name}/slides/${encodeURIComponent(
+                    d.thumb
+                  )}" alt="${d.name} first slide" loading="lazy"></a>
+          <div class="meta">
+            <div class="name">${d.name}</div>
+            <div class="count">${d.slides} slide${d.slides === 1 ? '' : 's'}</div>
+            <div class="links">
+              <a class="watch" href="/${d.name}/">Watch</a>
+              <a class="present" href="/${d.name}/?present">Present</a>
+            </div>
+          </div>
+        </div>`
+              )
+              .join('')
+          : '<p class="empty">No presentations yet.</p>';
       });
   </script>
 </body>

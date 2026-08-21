@@ -68,9 +68,12 @@ function listDecks() {
     return fs
       .readdirSync(DECKS_DIR, { withFileTypes: true })
       .filter((d) => d.isDirectory() && SLUG.test(d.name) && !RESERVED.has(d.name))
-      .map((d) => d.name)
-      .filter((name) => listSlides(name).length > 0)
-      .sort();
+      .map((d) => {
+        const slides = listSlides(d.name);
+        return { name: d.name, slides: slides.length, thumb: slides[0] || null };
+      })
+      .filter((d) => d.slides > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
   } catch {
     return [];
   }

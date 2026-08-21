@@ -4,9 +4,10 @@
   document.title = deck;
 
   const params = new URLSearchParams(location.search);
-  const key = params.get('key');
-  const hasKey = key !== null;
+  let currentKey = params.get('key'); // ?key=... still works, skips the prompt
+  const wantsPresent = params.has('present') || currentKey !== null;
   let confirmedPresenter = false; // only true once the server accepts the key
+  let intentionalClose = false;
 
   const slides = await (await fetch('slides.json')).json();
   const container = document.querySelector('.slides');
@@ -24,22 +25,58 @@
     height: 900,
     margin: 0.02,
     center: true,
-    // navigate locally when a key is given; server-side the key is
-    // re-checked and the role confirmed via the 'state' message
-    controls: hasKey,
-    progress: hasKey,
-    keyboard: hasKey,
-    touch: hasKey,
-    overview: hasKey,
+    // presenter mode always gets local navigation; a valid key only
+    // controls whether slide moves are broadcast to viewers
+    controls: wantsPresent,
+    progress: wantsPresent,
+    keyboard: wantsPresent,
+    touch: wantsPresent,
+    overview: wantsPresent,
   });
 
   const hud = document.getElementById('hud');
   const badge = document.getElementById('badge');
   const conn = document.getElementById('conn');
+  const overlay = document.getElementById('key-overlay');
+  const keyForm = document.getElementById('key-form');
+  const keyInput = document.getElementById('key-input');
 
-  if (hasKey) {
+  function askKey() {
+    overlay.hidden = false;
+    keyInput.value = '';
+    keyInput.focus();
+  }
+
+  keyForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const k = keyInput.value.trim();
+    if (!k) return;
+    currentKey = k;
+    overlay.hidden = true;
+    badge.textContent = 'CONNECTING…';
+    reconnect();
+  });
+
+  function cancelKey() {
+    overlay.hidden = true;
+  }
+  document.getElementById('key-cancel').addEventListener('click', cancelKey);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !overlay.hidden) cancelKey();
+  });
+
+  // clicking KEY REJECTED / ENTER KEY lets you try again
+  badge.addEventListener('click', () => {
+    if (wantsPresent && !confirmedPresenter) askKey();
+  });
+
+  if (wantsPresent) {
+    hud.hidden = false;
+    badge.textContent = currentKey ? 'CONNECTING…' : 'ENTER KEY';
+    badge.classList.add('bad');
+    if (!currentKey) askKey();
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'f') {
+      if (e.key === 'f' && overlay.hidden) {
         if (document.fullscreenElement) document.exitFullscreen();
         else document.documentElement.requestFullscreen();
       }
@@ -52,8 +89,6 @@
   }
 
   const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const keyParam = hasKey ? `&key=${encodeURIComponent(key)}` : '';
-  const wsUrl = `${wsProto}://${location.host}/sync?deck=${encodeURIComponent(deck)}${keyParam}`;
   let ws = null;
 
   function applyIndex(i) {
@@ -61,19 +96,17 @@
   }
 
   function connect() {
-    ws = new WebSocket(wsUrl);
+    const keyParam = currentKey ? `&key=${encodeURIComponent(currentKey)}` : '';
+    ws = new WebSocket(`${wsProto}://${location.host}/sync?deck=${encodeURIComponent(deck)}${keyParam}`);
     ws.onopen = () => setConnected(true);
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === 'state') {
         confirmedPresenter = msg.role === 'presenter';
         if (confirmedPresenter) {
-          hud.hidden = false;
           badge.textContent = 'PRESENTER';
           badge.classList.remove('bad');
-        } else if (hasKey) {
-          // a key was given but the server rejected it — make it obvious
-          hud.hidden = false;
+        } else if (wantsPresent && currentKey) {
           badge.textContent = 'KEY REJECTED';
           badge.classList.add('bad');
         }
@@ -84,8 +117,17 @@
     };
     ws.onclose = () => {
       setConnected(false);
-      setTimeout(connect, 800 + Math.random() * 800);
+      if (!intentionalClose) setTimeout(connect, 800 + Math.random() * 800);
+      intentionalClose = false;
     };
+  }
+
+  function reconnect() {
+    if (ws && ws.readyState <= 1) {
+      intentionalClose = true;
+      ws.close();
+    }
+    connect();
   }
   connect();
 
