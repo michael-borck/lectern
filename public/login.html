@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in — present</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background: #141416;
+      color: #eee;
+      font: 16px/1.5 system-ui, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px;
+    }
+    .card {
+      background: #1e1e22;
+      border: 1px solid #2c2c31;
+      border-radius: 14px;
+      padding: 32px;
+      width: min(380px, 94vw);
+    }
+    .logo {
+      font-size: 1.8em;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(90deg, #6cf, #b9f);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin: 0 0 4px;
+    }
+    .sub { color: #999; font-size: 0.9em; margin: 0 0 24px; }
+    label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 0.95em; }
+    input {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 8px;
+      border: 1px solid #3a3a41;
+      background: #141416;
+      color: #eee;
+      font: inherit;
+      margin-bottom: 14px;
+    }
+    input:focus { outline: none; border-color: #6cf; }
+    button {
+      width: 100%;
+      padding: 11px 0;
+      border: none;
+      border-radius: 8px;
+      background: #b00;
+      color: #fff;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #d00; }
+    button:disabled { background: #555; cursor: default; }
+    .error {
+      background: #3a1114;
+      border: 1px solid #7c2328;
+      color: #ff9b9b;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 0.88em;
+      margin-bottom: 14px;
+    }
+    .note { color: #888; font-size: 0.82em; margin-top: 16px; text-align: center; }
+    .note a { color: #6cf; text-decoration: none; }
+    #step-code { display: none; }
+    .back {
+      background: none;
+      color: #6cf;
+      padding: 0;
+      margin-top: 10px;
+      font-weight: 400;
+      font-size: 0.88em;
+    }
+    .back:hover { background: none; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <p class="logo">present</p>
+    <p class="sub">Sign in to present — no password, we email you a code.</p>
+
+    <div id="error" class="error" hidden></div>
+
+    <form id="step-email">
+      <label for="email">Email</label>
+      <input id="email" type="email" required autocomplete="email" placeholder="you@example.com">
+      <button type="submit">Email me a code</button>
+    </form>
+
+    <form id="step-code">
+      <label for="code">6-digit code <span id="sent-to" style="color:#888;font-weight:400"></span></label>
+      <input id="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code" placeholder="000000">
+      <button type="submit">Sign in</button>
+      <button type="button" class="back" id="use-other">use a different email</button>
+    </form>
+
+    <p class="note"><a href="/">← live presentations</a></p>
+  </div>
+
+  <script>
+    const next = new URLSearchParams(location.search).get('next') || '/dashboard';
+    const errBox = document.getElementById('error');
+    let email = '';
+
+    function fail(msg) {
+      errBox.textContent = msg;
+      errBox.hidden = false;
+    }
+
+    document.getElementById('step-email').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errBox.hidden = true;
+      const btn = e.target.querySelector('button');
+      btn.disabled = true;
+      email = document.getElementById('email').value.trim();
+      try {
+        const r = await fetch('/api/auth/request-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const data = await r.json();
+        if (!r.ok) return fail(data.error || 'could not send code');
+        document.getElementById('step-email').style.display = 'none';
+        document.getElementById('step-code').style.display = 'block';
+        document.getElementById('sent-to').textContent = `(sent to ${email})`;
+        document.getElementById('code').focus();
+      } catch {
+        fail('network error — try again');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById('step-code').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errBox.hidden = true;
+      const code = document.getElementById('code').value.trim();
+      const r = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+      });
+      const data = await r.json();
+      if (!r.ok) return fail(data.error || 'sign-in failed');
+      location.href = next.startsWith('/') ? next : '/dashboard';
+    });
+
+    document.getElementById('use-other').addEventListener('click', () => {
+      document.getElementById('step-code').style.display = 'none';
+      document.getElementById('step-email').style.display = 'block';
+      errBox.hidden = true;
+    });
+  </script>
+</body>
+</html>

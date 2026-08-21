@@ -12,21 +12,31 @@
   <div class="reveal">
     <div class="slides"></div>
   </div>
+
   <div id="hud" hidden>
     <span id="conn" title="connected"></span><span id="badge">PRESENTER</span>
     <span id="viewers-wrap"><span id="viewers">0</span> watching</span>
+    <button id="share-btn" type="button">Share</button>
+    <button id="end-btn" type="button">End</button>
   </div>
-  <div id="key-overlay" hidden>
-    <form id="key-form">
-      <label for="key-input">Presenter key</label>
-      <input id="key-input" type="password" autocomplete="off" autofocus>
-      <div class="row">
-        <button type="submit">Start presenting</button>
-        <button type="button" id="key-cancel">Just watch</button>
-      </div>
-    </form>
+
+  <div id="qr-overlay" hidden>
+    <div id="qr-card">
+      <div id="qr-img"></div>
+      <p id="qr-url"></p>
+      <p class="hint">Scan or share the link — press <kbd>q</kbd> to toggle</p>
+    </div>
   </div>
+
+  <div id="ended-overlay" hidden>
+    <div class="ended-card">
+      <h1>This presentation has ended</h1>
+      <p><a href="/">See live presentations</a></p>
+    </div>
+  </div>
+
   <script src="/reveal/reveal.js"></script>
+  <script src="/qrcode.js"></script>
   <script src="/viewer.js"></script>
 </body>
 </html>

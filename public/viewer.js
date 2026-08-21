@@ -1,13 +1,12 @@
 (async () => {
-  // this page is served at /<deck>/
-  const deck = location.pathname.split('/').filter(Boolean)[0];
-  document.title = deck;
+  // this page is served at /<handle>/<deck>/
+  const segs = location.pathname.split('/').filter(Boolean);
+  const deckKey = `${segs[0]}/${segs[1]}`;
+  document.title = segs[1];
 
   const params = new URLSearchParams(location.search);
-  let currentKey = params.get('key'); // ?key=... still works, skips the prompt
-  const wantsPresent = params.has('present') || currentKey !== null;
-  let confirmedPresenter = false; // only true once the server accepts the key
-  let intentionalClose = false;
+  const wantsPresent = params.has('present'); // server already enforced ownership
+  let confirmedPresenter = false;
 
   const slides = await (await fetch('slides.json')).json();
   const container = document.querySelector('.slides');
@@ -15,7 +14,7 @@
     ? slides
         .map((f) => `<section><img src="slides/${encodeURIComponent(f)}" alt=""></section>`)
         .join('')
-    : '<section><p>No slides yet — drop PNGs into this deck’s folder and reload.</p></section>';
+    : '<section><p>No slides yet.</p></section>';
 
   await Reveal.initialize({
     hash: false,
@@ -25,8 +24,6 @@
     height: 900,
     margin: 0.02,
     center: true,
-    // presenter mode always gets local navigation; a valid key only
-    // controls whether slide moves are broadcast to viewers
     controls: wantsPresent,
     progress: wantsPresent,
     keyboard: wantsPresent,
@@ -37,46 +34,36 @@
   const hud = document.getElementById('hud');
   const badge = document.getElementById('badge');
   const conn = document.getElementById('conn');
-  const overlay = document.getElementById('key-overlay');
-  const keyForm = document.getElementById('key-form');
-  const keyInput = document.getElementById('key-input');
-
-  function askKey() {
-    overlay.hidden = false;
-    keyInput.value = '';
-    keyInput.focus();
-  }
-
-  keyForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const k = keyInput.value.trim();
-    if (!k) return;
-    currentKey = k;
-    overlay.hidden = true;
-    badge.textContent = 'CONNECTING…';
-    reconnect();
-  });
-
-  function cancelKey() {
-    overlay.hidden = true;
-  }
-  document.getElementById('key-cancel').addEventListener('click', cancelKey);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !overlay.hidden) cancelKey();
-  });
-
-  // clicking KEY REJECTED / ENTER KEY lets you try again
-  badge.addEventListener('click', () => {
-    if (wantsPresent && !confirmedPresenter) askKey();
-  });
+  const qrOverlay = document.getElementById('qr-overlay');
+  const endedOverlay = document.getElementById('ended-overlay');
 
   if (wantsPresent) {
     hud.hidden = false;
-    badge.textContent = currentKey ? 'CONNECTING…' : 'ENTER KEY';
-    badge.classList.add('bad');
-    if (!currentKey) askKey();
+    badge.textContent = 'CONNECTING…';
+
+    // QR share overlay
+    const viewerUrl = `${location.origin}/${deckKey}/`;
+    const qr = qrcode(0, 'M');
+    qr.addData(viewerUrl);
+    qr.make();
+    document.getElementById('qr-img').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
+    document.getElementById('qr-url').textContent = viewerUrl;
+
+    const toggleQr = () => (qrOverlay.hidden = !qrOverlay.hidden);
+    document.getElementById('share-btn').addEventListener('click', toggleQr);
+    qrOverlay.addEventListener('click', toggleQr);
+
+    document.getElementById('end-btn').addEventListener('click', async () => {
+      if (!confirm('End this presentation for all viewers?')) return;
+      const me = await (await fetch('/api/me')).json();
+      const d = me.decks.find((x) => `${x.handle}/${x.slug}` === deckKey);
+      if (d) await fetch(`/api/decks/${d.id}/stop`, { method: 'POST' });
+      location.href = '/dashboard';
+    });
+
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'f' && overlay.hidden) {
+      if (e.key === 'q') toggleQr();
+      if (e.key === 'f' && qrOverlay.hidden) {
         if (document.fullscreenElement) document.exitFullscreen();
         else document.documentElement.requestFullscreen();
       }
@@ -96,38 +83,31 @@
   }
 
   function connect() {
-    const keyParam = currentKey ? `&key=${encodeURIComponent(currentKey)}` : '';
-    ws = new WebSocket(`${wsProto}://${location.host}/sync?deck=${encodeURIComponent(deck)}${keyParam}`);
+    ws = new WebSocket(`${wsProto}://${location.host}/sync?deck=${encodeURIComponent(deckKey)}`);
     ws.onopen = () => setConnected(true);
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === 'state') {
         confirmedPresenter = msg.role === 'presenter';
-        if (confirmedPresenter) {
-          badge.textContent = 'PRESENTER';
-          badge.classList.remove('bad');
-        } else if (wantsPresent && currentKey) {
-          badge.textContent = 'KEY REJECTED';
-          badge.classList.add('bad');
+        if (wantsPresent) {
+          badge.textContent = confirmedPresenter ? 'PRESENTER' : 'VIEWER';
+          badge.classList.toggle('bad', !confirmedPresenter);
         }
         applyIndex(msg.index);
       }
       if (msg.type === 'goto') applyIndex(msg.index);
       if (msg.type === 'viewers') document.getElementById('viewers').textContent = msg.count;
+      if (msg.type === 'ended' && !confirmedPresenter) {
+        endedOverlay.hidden = false;
+        ws.onclose = null;
+        ws.close();
+      }
     };
-    ws.onclose = () => {
+    ws.onclose = (e) => {
       setConnected(false);
-      if (!intentionalClose) setTimeout(connect, 800 + Math.random() * 800);
-      intentionalClose = false;
+      if (e.code === 4003 || e.code === 4004 || e.code === 4000) return; // ended/gone — don't retry
+      setTimeout(connect, 800 + Math.random() * 800);
     };
-  }
-
-  function reconnect() {
-    if (ws && ws.readyState <= 1) {
-      intentionalClose = true;
-      ws.close();
-    }
-    connect();
   }
   connect();
 

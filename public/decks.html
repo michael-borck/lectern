@@ -131,34 +131,70 @@
       color: #eee;
     }
     .watch:hover { background: #3a3a41; }
-    .present {
+    .empty { color: #888; }
+    .livebadge {
+      display: inline-block;
       background: #b00;
       color: #fff;
+      border-radius: 3px;
+      padding: 0 6px;
+      font-size: 0.68em;
+      letter-spacing: 0.1em;
+      margin-left: 6px;
+      vertical-align: middle;
+      animation: pulse 1.6s ease-in-out infinite;
     }
-    .present:hover { background: #d00; }
-    .empty { color: #888; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.55; }
+    }
+    nav {
+      display: flex;
+      justify-content: flex-end;
+      padding-top: 22px;
+    }
+    nav a {
+      color: #ccc;
+      text-decoration: none;
+      font-size: 0.9em;
+      background: #2c2c31;
+      border-radius: 7px;
+      padding: 7px 14px;
+    }
+    nav a:hover { background: #3a3a41; }
   </style>
 </head>
 <body>
+  <nav><a href="/dashboard" id="navlink">Sign in to present</a></nav>
+
   <header class="hero">
     <p class="logo">present</p>
     <p class="tagline">Synced slide sharing over a plain URL</p>
     <p class="blurb">
       No invites, no accounts, no apps. The presenter drives the slides and every
-      screen follows along in real time — pick a talk below to join.
+      screen follows along in real time — join a live talk below.
     </p>
     <div class="how">
-      <div><b>Watch</b>Open a talk and follow along live as the presenter advances.</div>
-      <div><b>Present</b>Drive the slides yourself — you’ll be asked for the presenter key.</div>
-      <div><b>Anywhere</b>Any laptop, any browser. Share the link, that’s the whole setup.</div>
+      <div><b>Watch</b>Open a live talk and follow along as the presenter advances.</div>
+      <div><b>Present</b>Sign in, upload a PDF or PPTX, hit Present — share the QR or link.</div>
+      <div><b>Anywhere</b>Any laptop, any browser. The link is the whole setup.</div>
     </div>
   </header>
 
-  <h2>Talks</h2>
+  <h2>Live now</h2>
   <div id="decks"><p class="empty">Loading…</p></div>
 
   <script>
-    fetch('/decks.json')
+    const esc = (s) =>
+      String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    fetch('/api/me')
+      .then((r) => r.json())
+      .then((me) => {
+        if (me.user) document.getElementById('navlink').textContent = `Dashboard — ${me.user.handle}`;
+      });
+
+    fetch('/api/live.json')
       .then((r) => r.json())
       .then((decks) => {
         document.getElementById('decks').innerHTML = decks.length
@@ -166,21 +202,20 @@
               .map(
                 (d) => `
         <div class="card">
-          <a class="thumb" href="/${d.name}/"><img src="/${d.name}/slides/${encodeURIComponent(
+          <a class="thumb" href="${d.url}"><img src="${d.url}slides/${encodeURIComponent(
                     d.thumb
-                  )}" alt="${d.name} first slide" loading="lazy"></a>
+                  )}" alt="${esc(d.title)} first slide" loading="lazy"></a>
           <div class="meta">
-            <div class="name">${d.name}</div>
-            <div class="count">${d.slides} slide${d.slides === 1 ? '' : 's'}</div>
+            <div class="name">${esc(d.title)}<span class="livebadge">LIVE</span></div>
+            <div class="count">by ${esc(d.handle)} · ${d.slides} slide${d.slides === 1 ? '' : 's'}</div>
             <div class="links">
-              <a class="watch" href="/${d.name}/">Watch</a>
-              <a class="present" href="/${d.name}/?present">Present</a>
+              <a class="watch" href="${d.url}">Watch</a>
             </div>
           </div>
         </div>`
               )
               .join('')
-          : '<p class="empty">No presentations yet.</p>';
+          : '<p class="empty">Nothing live right now — check back later.</p>';
       });
   </script>
 </body>

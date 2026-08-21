@@ -7,8 +7,17 @@ services:
       # to host.docker.internal:3100.
       - "3100:3000"
     environment:
-      PRESENTER_SECRET: ${PRESENTER_SECRET:?set PRESENTER_SECRET in .env or the shell}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-dev}
+      EMAIL_FROM: ${EMAIL_FROM:-present@localhost}
+      ALLOWED_DOMAINS: ${ALLOWED_DOMAINS:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
     volumes:
-      # decks are read from this host folder; drop a folder per talk here
-      - ./presentations:/app/presentations:ro
+      # decks land here via upload (read-write on purpose)
+      - ./presentations:/app/presentations
+      # SQLite: users, sessions, deck registry
+      - ./data:/app/data
     restart: unless-stopped

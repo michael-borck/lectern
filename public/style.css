@@ -30,6 +30,8 @@ html, body {
   font: 12px/1.6 system-ui, sans-serif;
   color: #aaa;
   user-select: none;
+  display: flex;
+  align-items: center;
 }
 #hud #badge {
   background: #b00;
@@ -44,7 +46,6 @@ html, body {
 }
 /* connection dot: green = synced, gray = reconnecting */
 #hud #conn {
-  display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -54,76 +55,85 @@ html, body {
 #hud #conn.off {
   background: #888;
 }
-#hud #badge.bad {
+#hud button {
+  background: #2c2c31;
+  color: #eee;
+  border: none;
+  border-radius: 5px;
+  padding: 2px 9px;
+  margin-left: 8px;
+  font: inherit;
   cursor: pointer;
 }
+#hud button:hover {
+  background: #3a3a41;
+}
+#viewers-wrap {
+  margin-right: 2px;
+}
 
-/* presenter-key overlay */
-#key-overlay {
+/* QR share overlay */
+#qr-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(0, 0, 0, 0.8);
   z-index: 40;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-#key-overlay[hidden] {
+#qr-overlay[hidden] {
   display: none;
 }
-#key-form {
-  background: #1e1e22;
-  border: 1px solid #2c2c31;
-  border-radius: 12px;
-  padding: 24px;
-  width: min(320px, 90vw);
-  font: 14px/1.5 system-ui, sans-serif;
-  color: #eee;
+#qr-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 28px 32px;
+  text-align: center;
+  font: 15px/1.5 system-ui, sans-serif;
+  color: #111;
+  max-width: min(480px, 92vw);
 }
-#key-form label {
-  display: block;
-  font-weight: 600;
-  margin-bottom: 10px;
+#qr-card #qr-img svg {
+  width: min(320px, 60vw);
+  height: auto;
 }
-#key-form input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 9px 10px;
-  border-radius: 7px;
-  border: 1px solid #3a3a41;
-  background: #141416;
-  color: #eee;
-  margin-bottom: 14px;
-  font: inherit;
+#qr-card #qr-url {
+  font-weight: 700;
+  font-size: 1.1em;
+  word-break: break-all;
+  margin: 12px 0 4px;
 }
-#key-form input:focus {
-  outline: none;
-  border-color: #6cf;
+#qr-card .hint {
+  color: #777;
+  font-size: 0.85em;
+  margin: 0;
 }
-#key-form .row {
+#qr-card kbd {
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0 5px;
+}
+
+/* ended overlay (viewers) */
+#ended-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 50;
   display: flex;
-  gap: 10px;
+  align-items: center;
+  justify-content: center;
 }
-#key-form button {
-  flex: 1;
-  padding: 8px 0;
-  border: none;
-  border-radius: 7px;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
+#ended-overlay[hidden] {
+  display: none;
 }
-#key-form button[type='submit'] {
-  background: #b00;
-  color: #fff;
-}
-#key-form button[type='submit']:hover {
-  background: #d00;
-}
-#key-cancel {
-  background: #2c2c31;
+.ended-card {
+  text-align: center;
+  font: 16px/1.6 system-ui, sans-serif;
   color: #eee;
 }
-#key-cancel:hover {
-  background: #3a3a41;
+.ended-card a {
+  color: #6cf;
 }

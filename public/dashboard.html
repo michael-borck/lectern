@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard — present</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background: #141416;
+      color: #eee;
+      font: 16px/1.5 system-ui, sans-serif;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+    .logo {
+      font-size: 1.5em;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(90deg, #6cf, #b9f);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-decoration: none;
+    }
+    header .spacer { flex: 1; }
+    header .who { color: #999; font-size: 0.9em; }
+    button.linkish {
+      background: #2c2c31;
+      color: #eee;
+      border: none;
+      border-radius: 7px;
+      padding: 7px 14px;
+      font: inherit;
+      font-size: 0.88em;
+      cursor: pointer;
+    }
+    button.linkish:hover { background: #3a3a41; }
+
+    .upload {
+      background: #1e1e22;
+      border: 1px solid #2c2c31;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+    .upload h2 { margin: 0 0 12px; font-size: 1.05em; }
+    .upload form { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .upload input[type='text'] {
+      flex: 1;
+      min-width: 180px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #3a3a41;
+      background: #141416;
+      color: #eee;
+      font: inherit;
+    }
+    .upload input[type='file'] { color: #bbb; font-size: 0.9em; }
+    .upload button {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      background: #b00;
+      color: #fff;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .upload button:hover { background: #d00; }
+    .upload button:disabled { background: #555; cursor: default; }
+    .upload .hint { color: #888; font-size: 0.82em; margin: 10px 0 0; }
+    .upload .error { color: #ff9b9b; font-size: 0.88em; margin: 10px 0 0; }
+
+    #decks {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: #1e1e22;
+      border: 1px solid #2c2c31;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .card.live { border-color: #b00; }
+    .thumb {
+      aspect-ratio: 16 / 9;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+      font-size: 0.85em;
+    }
+    .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .meta { padding: 12px 14px 14px; }
+    .title { font-weight: 600; word-break: break-word; }
+    .sub2 { color: #888; font-size: 0.82em; margin-top: 2px; }
+    .sub2 .err { color: #ff9b9b; }
+    .livebadge {
+      display: inline-block;
+      background: #b00;
+      color: #fff;
+      border-radius: 3px;
+      padding: 0 6px;
+      font-size: 0.72em;
+      letter-spacing: 0.1em;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .actions a, .actions button {
+      flex: 1;
+      min-width: 72px;
+      text-align: center;
+      text-decoration: none;
+      border: none;
+      border-radius: 7px;
+      padding: 7px 0;
+      font-size: 0.88em;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .presentbtn { background: #b00; color: #fff; }
+    .presentbtn:hover { background: #d00; }
+    .presentbtn:disabled { background: #555; cursor: default; }
+    .stopbtn { background: #2c6e31; color: #fff; }
+    .stopbtn:hover { background: #35853c; }
+    .delbtn { background: #2c2c31; color: #ddd; flex: 0 1 60px; }
+    .delbtn:hover { background: #5a2020; }
+    .empty { color: #888; }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="logo" href="/">present</a>
+    <span class="spacer"></span>
+    <span class="who" id="who"></span>
+    <button class="linkish" id="logout">Sign out</button>
+  </header>
+
+  <div class="upload">
+    <h2>Upload a deck</h2>
+    <form id="upload-form">
+      <input type="text" id="title" placeholder="Talk title (optional)">
+      <input type="file" id="file" accept=".pdf,.pptx" required>
+      <button type="submit" id="upload-btn">Upload</button>
+    </form>
+    <p class="hint">PDF or PPTX, max 50 MB. PPTX is converted to slides on the server (can take a moment).</p>
+    <p class="error" id="upload-error" hidden></p>
+  </div>
+
+  <div id="decks"><p class="empty">Loading…</p></div>
+
+  <script src="/dashboard.js"></script>
+</body>
+</html>

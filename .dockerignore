@@ -6,3 +6,5 @@ deploy
 .DS_Store
 ._*
 nohup.out
+.env
+data
