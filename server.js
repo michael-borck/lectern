@@ -205,7 +205,25 @@ wss.on('connection', (ws, req) => {
     clients.delete(ws);
     broadcastViewerCount(deck);
   });
+
+  ws.isAlive = true;
+  ws.on('pong', () => {
+    ws.isAlive = true;
+  });
 });
+
+// keep connections alive through proxies that idle-kill WebSockets
+setInterval(() => {
+  for (const ws of clients) {
+    if (ws.isAlive === false) {
+      clients.delete(ws);
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, 30000);
 
 server.listen(PORT, () => {
   console.log(`present listening on :${PORT}, decks from ${DECKS_DIR}`);
