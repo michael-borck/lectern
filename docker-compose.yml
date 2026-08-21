@@ -1,0 +1,11 @@
+services:
+  present:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      PRESENTER_SECRET: ${PRESENTER_SECRET:?set PRESENTER_SECRET in .env or the shell}
+    volumes:
+      # decks are read from this host folder; drop a folder per talk here
+      - ./presentations:/app/presentations:ro
+    restart: unless-stopped

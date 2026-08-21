@@ -1,0 +1,8 @@
+node_modules
+presentations
+deploy
+.git
+*.pdf
+.DS_Store
+._*
+nohup.out

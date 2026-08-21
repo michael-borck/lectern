@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Presentations</title>
+  <style>
+    body {
+      background: #111;
+      color: #eee;
+      font: 18px/1.6 system-ui, sans-serif;
+      max-width: 40em;
+      margin: 15vh auto;
+      padding: 0 1em;
+    }
+    h1 { font-size: 1.6em; }
+    a { color: #6cf; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    ul { list-style: none; padding: 0; }
+    li { margin: 0.4em 0; }
+    .empty { color: #888; }
+  </style>
+</head>
+<body>
+  <h1>Presentations</h1>
+  <ul id="decks"><li class="empty">Loading…</li></ul>
+  <script>
+    fetch('/decks.json')
+      .then((r) => r.json())
+      .then((decks) => {
+        document.getElementById('decks').innerHTML = decks.length
+          ? decks.map((d) => `<li><a href="/${d}/">${d}</a></li>`).join('')
+          : '<li class="empty">No presentations yet.</li>';
+      });
+  </script>
+</body>
+</html>

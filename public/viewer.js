@@ -1,15 +1,19 @@
 (async () => {
+  // this page is served at /<deck>/
+  const deck = location.pathname.split('/').filter(Boolean)[0];
+  document.title = deck;
+
   const params = new URLSearchParams(location.search);
   const key = params.get('key');
   const isPresenter = key !== null;
 
-  const slides = await (await fetch('/slides.json')).json();
+  const slides = await (await fetch('slides.json')).json();
   const container = document.querySelector('.slides');
   container.innerHTML = slides.length
     ? slides
-        .map((f) => `<section><img src="/slides/${encodeURIComponent(f)}" alt=""></section>`)
+        .map((f) => `<section><img src="slides/${encodeURIComponent(f)}" alt=""></section>`)
         .join('')
-    : '<section><p>No slides yet — drop PNGs into <code>slides/</code> and reload.</p></section>';
+    : '<section><p>No slides yet — drop PNGs into this deck’s folder and reload.</p></section>';
 
   await Reveal.initialize({
     hash: false,
@@ -38,7 +42,8 @@
   }
 
   const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const wsUrl = `${wsProto}://${location.host}/sync${isPresenter ? `?key=${encodeURIComponent(key)}` : ''}`;
+  const keyParam = isPresenter ? `&key=${encodeURIComponent(key)}` : '';
+  const wsUrl = `${wsProto}://${location.host}/sync?deck=${encodeURIComponent(deck)}${keyParam}`;
   let ws = null;
 
   function applyIndex(i) {
