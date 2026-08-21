@@ -79,6 +79,15 @@
     .upload button:disabled { background: #555; cursor: default; }
     .upload .hint { color: #888; font-size: 0.82em; margin: 10px 0 0; }
     .upload .error { color: #ff9b9b; font-size: 0.88em; margin: 10px 0 0; }
+    .upload .pptx-warn {
+      background: #2e2614;
+      border: 1px solid #6b5a23;
+      color: #e8cd7a;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 0.85em;
+      margin: 12px 0 0;
+    }
 
     #decks {
       display: grid;
@@ -157,6 +166,12 @@
       <button type="submit" id="upload-btn">Upload</button>
     </form>
     <p class="hint">PDF or PPTX, max 50 MB. PPTX is converted to slides on the server (can take a moment).</p>
+    <p class="pptx-warn" id="pptx-warn" hidden>
+      <strong>PPTX fidelity note:</strong> LibreOffice conversion is good but not PowerPoint-perfect —
+      custom fonts and complex animations may shift (Arial/Calibri metrics are covered).
+      If a deck matters a lot, export a PDF from PowerPoint yourself and upload that instead —
+      same dashboard, pixel-exact.
+    </p>
     <p class="error" id="upload-error" hidden></p>
   </div>
 

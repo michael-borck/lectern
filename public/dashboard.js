@@ -64,6 +64,12 @@
     if (me.decks.some((d) => d.status === 'converting')) setTimeout(refresh, 3000);
   }
 
+  // show the fidelity warning when a .pptx is picked
+  document.getElementById('file').addEventListener('change', (e) => {
+    const isPptx = /\.pptx?$/i.test(e.target.files[0]?.name || '');
+    document.getElementById('pptx-warn').hidden = !isPptx;
+  });
+
   document.getElementById('upload-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const errEl = document.getElementById('upload-error');
