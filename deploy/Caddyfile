@@ -1,0 +1,6 @@
+# Caddy handles TLS automatically and proxies WebSocket upgrades.
+# Point the domain's A record at this VPS, put this in /etc/caddy/Caddyfile, then:
+#   systemctl reload caddy
+talk.example.com
+
+reverse_proxy 127.0.0.1:3000

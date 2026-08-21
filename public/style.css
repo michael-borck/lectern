@@ -1,0 +1,37 @@
+html, body {
+  background: #000;
+}
+
+/* letterboxed slide images, no reveal chrome on them */
+.reveal .slides section img {
+  display: block;
+  margin: 0 auto;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: none;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+/* presenter HUD, top-left */
+#hud {
+  position: fixed;
+  top: 10px;
+  left: 12px;
+  z-index: 30;
+  font: 12px/1.6 system-ui, sans-serif;
+  color: #aaa;
+  user-select: none;
+}
+#hud #badge {
+  background: #b00;
+  color: #fff;
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-right: 8px;
+  letter-spacing: 0.08em;
+}
