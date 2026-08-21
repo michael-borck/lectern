@@ -1,6 +1,7 @@
 # Caddy handles TLS automatically and proxies WebSocket upgrades.
-# Point the domain's A record at this VPS, put this in /etc/caddy/Caddyfile, then:
+# On the homelab this stanza lives in ~/homelab/caddy/Caddyfile instead;
+# this file is the reference for a standalone VPS deployment:
 #   systemctl reload caddy
-talk.example.com
+present.eduserver.au
 
-reverse_proxy 127.0.0.1:3000
+reverse_proxy 127.0.0.1:3100

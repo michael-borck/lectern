@@ -7,7 +7,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/present
-Environment=PORT=3000
+Environment=PORT=3100
 Environment=PRESENTER_SECRET=CHANGE-ME
 ExecStart=/usr/bin/node server.js
 Restart=always

@@ -2,7 +2,10 @@ services:
   present:
     build: .
     ports:
-      - "3000:3000"
+      # Host port 3100, not the app's default 3000: cite-sight already
+      # publishes 3000 on the host. Caddy proxies present.eduserver.au
+      # to host.docker.internal:3100.
+      - "3100:3000"
     environment:
       PRESENTER_SECRET: ${PRESENTER_SECRET:?set PRESENTER_SECRET in .env or the shell}
     volumes:
