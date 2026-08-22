@@ -6,7 +6,7 @@
 //   RESEND_API_KEY                            (provider=resend)
 
 const PROVIDER = (process.env.EMAIL_PROVIDER || 'dev').toLowerCase();
-const FROM = process.env.EMAIL_FROM || 'present@localhost';
+const FROM = process.env.EMAIL_FROM || 'lectern@localhost';
 
 async function sendSmtp(to, subject, text) {
   const nodemailer = require('nodemailer');
@@ -35,7 +35,7 @@ async function sendResend(to, subject, text) {
 }
 
 async function sendCode(to, code) {
-  const subject = `${code} — your present login code`;
+  const subject = `${code} — your lectern login code`;
   const text = `Your login code is: ${code}\n\nIt expires in 10 minutes.\n`;
   if (PROVIDER === 'dev') {
     console.log(`[email:dev] code for ${to}: ${code}`);

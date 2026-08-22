@@ -7,7 +7,17 @@ const path = require('path');
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
-const db = new Database(path.join(DATA_DIR, 'present.db'));
+// renamed from "present" — adopt the old database file if it's still there
+const DB_PATH = path.join(DATA_DIR, 'lectern.db');
+const LEGACY_DB = path.join(DATA_DIR, 'present.db');
+if (!fs.existsSync(DB_PATH) && fs.existsSync(LEGACY_DB)) {
+  fs.renameSync(LEGACY_DB, DB_PATH);
+  for (const ext of ['-wal', '-shm']) {
+    if (fs.existsSync(LEGACY_DB + ext)) fs.renameSync(LEGACY_DB + ext, DB_PATH + ext);
+  }
+}
+
+const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 

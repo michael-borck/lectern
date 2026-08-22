@@ -31,7 +31,7 @@ async function convert(uploadPath, kind, outDir) {
   if (!hasBinary('pdftoppm')) {
     throw new Error('server is missing pdftoppm (poppler) — cannot convert');
   }
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'present-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lectern-'));
   try {
     let pdfPath = uploadPath;
     if (kind === 'pptx') {

@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const db = require('./db');
 const email = require('./email');
 
-const COOKIE = 'present_session';
+const COOKIE = 'lectern_session';
 
 const ALLOWED_DOMAINS = (process.env.ALLOWED_DOMAINS || '')
   .split(',')

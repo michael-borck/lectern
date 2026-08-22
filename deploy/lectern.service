@@ -1,0 +1,19 @@
+# /etc/systemd/system/lectern.service  (bare-metal alternative to Docker)
+# After writing: systemctl daemon-reload && systemctl enable --now lectern
+[Unit]
+Description=lectern — synced slide sharing
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/lectern
+Environment=PORT=3100
+Environment=DATA_DIR=/opt/lectern/data
+Environment=EMAIL_PROVIDER=dev
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=2
+User=root
+
+[Install]
+WantedBy=multi-user.target

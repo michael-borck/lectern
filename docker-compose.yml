@@ -1,14 +1,14 @@
 services:
-  present:
+  lectern:
     build: .
     ports:
       # Host port 3100, not the app's default 3000: cite-sight already
-      # publishes 3000 on the host. Caddy proxies present.eduserver.au
+      # publishes 3000 on the host. Caddy proxies lectern.eduserver.au
       # to host.docker.internal:3100.
       - "3100:3000"
     environment:
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-dev}
-      EMAIL_FROM: ${EMAIL_FROM:-present@localhost}
+      EMAIL_FROM: ${EMAIL_FROM:-lectern@localhost}
       ALLOWED_DOMAINS: ${ALLOWED_DOMAINS:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}

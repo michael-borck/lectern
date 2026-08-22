@@ -1,4 +1,4 @@
-// present — synced slide sharing, multi-user.
+// lectern — synced slide sharing, multi-user.
 //
 //   /                      home: hero + live presentations
 //   /login                 passwordless email-code login
@@ -7,7 +7,7 @@
 //   /<handle>/<deck>/?present   presenter view (owner only; QR overlay on "q")
 //
 // Decks live in presentations/<handle>/<deck>/slide-*.png
-// Accounts/sessions/decks in data/present.db (SQLite)
+// Accounts/sessions/decks in data/lectern.db (SQLite)
 //
 // Env: PORT, DATA_DIR, DECKS_DIR, ALLOWED_DOMAINS, EMAIL_PROVIDER (+SMTP_*/RESEND_API_KEY)
 
@@ -189,7 +189,7 @@ function parseUpload(req) {
     bb.on('field', (name, val) => (fields[name] = val));
     bb.on('file', (name, stream, info) => {
       if (name !== 'file') return stream.resume();
-      const tmp = path.join(os.tmpdir(), `present-up-${crypto.randomBytes(8).toString('hex')}`);
+      const tmp = path.join(os.tmpdir(), `lectern-up-${crypto.randomBytes(8).toString('hex')}`);
       const out = fs.createWriteStream(tmp);
       stream.pipe(out);
       // size limit: drain the rest so parsing completes, reject afterwards
@@ -456,7 +456,7 @@ setInterval(() => {
 }, 30000);
 
 server.listen(PORT, () => {
-  console.log(`present listening on :${PORT}`);
+  console.log(`lectern listening on :${PORT}`);
   console.log(`decks: ${DECKS_DIR}`);
   if (auth.PROVIDER === 'dev' || require('./email').PROVIDER === 'dev') {
     console.log('EMAIL_PROVIDER=dev — login codes are printed to this log');
