@@ -98,11 +98,18 @@ html, body {
   width: min(320px, 60vw);
   height: auto;
 }
+#qr-card #qr-code {
+  font: 700 2.2em/1.1 ui-monospace, monospace;
+  letter-spacing: 0.35em;
+  text-indent: 0.35em; /* balance the letter-spacing */
+  margin: 10px 0 2px;
+}
 #qr-card #qr-url {
   font-weight: 700;
-  font-size: 1.1em;
+  font-size: 1.05em;
   word-break: break-all;
-  margin: 12px 0 4px;
+  margin: 4px 0 4px;
+  color: #444;
 }
 #qr-card .hint {
   color: #777;

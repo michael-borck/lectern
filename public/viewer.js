@@ -1,11 +1,12 @@
 (async () => {
-  // this page is served at /<handle>/<deck>/
+  // viewer URL: /j/<code>/   ·   presenter URL: /<handle>/<deck>/?present
   const segs = location.pathname.split('/').filter(Boolean);
-  const deckKey = `${segs[0]}/${segs[1]}`;
-  document.title = segs[1];
+  const joinCode = segs[0] === 'j' ? segs[1] : null;
+  const deckKey = joinCode ? null : `${segs[0]}/${segs[1]}`;
+  document.title = joinCode ? 'lectern — live' : segs[1];
 
   const params = new URLSearchParams(location.search);
-  const wantsPresent = params.has('present'); // server already enforced ownership
+  const wantsPresent = !joinCode && params.has('present'); // server already enforced ownership
   let confirmedPresenter = false;
 
   const slides = await (await fetch('slides.json')).json();
@@ -41,13 +42,17 @@
     hud.hidden = false;
     badge.textContent = 'CONNECTING…';
 
-    // QR share overlay
-    const viewerUrl = `${location.origin}/${deckKey}/`;
+    // QR share overlay: code + join URL come from the deck's live session
+    const me = await (await fetch('/api/me')).json();
+    const myDeck = (me.decks || []).find((x) => `${x.handle}/${x.slug}` === deckKey);
+    const code = myDeck && myDeck.code;
+    const joinUrl = code ? `${location.origin}/j/${code}/` : `${location.origin}/${deckKey}/`;
     const qr = qrcode(0, 'M');
-    qr.addData(viewerUrl);
+    qr.addData(joinUrl);
     qr.make();
     document.getElementById('qr-img').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
-    document.getElementById('qr-url').textContent = viewerUrl;
+    document.getElementById('qr-code').textContent = code || '';
+    document.getElementById('qr-url').textContent = joinUrl;
 
     const toggleQr = () => (qrOverlay.hidden = !qrOverlay.hidden);
     document.getElementById('share-btn').addEventListener('click', toggleQr);
@@ -55,8 +60,8 @@
 
     document.getElementById('end-btn').addEventListener('click', async () => {
       if (!confirm('End this presentation for all viewers?')) return;
-      const me = await (await fetch('/api/me')).json();
-      const d = me.decks.find((x) => `${x.handle}/${x.slug}` === deckKey);
+      const me2 = await (await fetch('/api/me')).json();
+      const d = (me2.decks || []).find((x) => `${x.handle}/${x.slug}` === deckKey);
       if (d) await fetch(`/api/decks/${d.id}/stop`, { method: 'POST' });
       location.href = '/dashboard';
     });
@@ -83,7 +88,10 @@
   }
 
   function connect() {
-    ws = new WebSocket(`${wsProto}://${location.host}/sync?deck=${encodeURIComponent(deckKey)}`);
+    const chan = joinCode
+      ? `code=${encodeURIComponent(joinCode)}`
+      : `deck=${encodeURIComponent(deckKey)}`;
+    ws = new WebSocket(`${wsProto}://${location.host}/sync?${chan}`);
     ws.onopen = () => setConnected(true);
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);

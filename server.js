@@ -138,16 +138,27 @@ function deckJson(deck) {
     handle: deck.handle,
     thumb: files[0] || null,
     url: `/${deck.handle}/${deck.slug}/`,
+    code: deck.live ? deck.code : undefined,
+    join_url: deck.live && deck.code ? `/j/${deck.code}/` : undefined,
   };
 }
 
 const slugify = (s) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'deck';
 
-// deck visible to this requester? (live for everyone; owner always)
+// join codes: 6 chars, unambiguous alphabet, unique among currently-live decks
+const CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
+function genCode() {
+  for (;;) {
+    let c = '';
+    for (let i = 0; i < 6; i++) c += CODE_ALPHABET[crypto.randomInt(CODE_ALPHABET.length)];
+    if (!db.codeInUse(c)) return c;
+  }
+}
+
+// pretty URL (/<handle>/<deck>/) is owner-only; viewers join via /j/<code>
 function deckVisibleTo(deck, user) {
   if (!deck || deck.status !== 'ready') return false;
-  if (deck.live) return true;
   return !!user && user.id === deck.user_id;
 }
 
@@ -302,6 +313,15 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, db.liveDecks().map(deckJson));
     }
 
+    // public thumbnail for home cards: first slide of a live deck only
+    const thumbMatch = url.pathname.match(/^\/api\/thumb\/(\d+)$/);
+    if (thumbMatch) {
+      const tdeck = db.getDeckById(Number(thumbMatch[1]));
+      const first = tdeck && tdeck.live && tdeck.status === 'ready' ? slideFiles(tdeck)[0] : null;
+      if (!first) return res.writeHead(404).end('not found');
+      return serveFile(res, deckDir(tdeck), `/${first}`);
+    }
+
     // ---- deck management API (owner only) ----
     const deckApi = url.pathname.match(/^\/api\/decks(?:\/(\d+)(?:\/(live|stop))?)?$/);
     if (deckApi) {
@@ -346,11 +366,19 @@ const server = http.createServer(async (req, res) => {
 
       if (req.method === 'POST' && action === 'live') {
         if (deck.status !== 'ready') return sendJson(res, 409, { error: 'deck is not ready yet' });
+        const code = genCode();
+        db.setDeckCode(deck.id, code);
         db.setDeckLive(deck.id, true);
-        return sendJson(res, 200, { ok: true, url: `/${deck.handle}/${deck.slug}/` });
+        return sendJson(res, 200, {
+          ok: true,
+          url: `/${deck.handle}/${deck.slug}/`,
+          join_url: `/j/${code}/`,
+          code,
+        });
       }
       if (req.method === 'POST' && action === 'stop') {
         db.setDeckLive(deck.id, false);
+        db.setDeckCode(deck.id, null);
         deckIndex.delete(key);
         endDeckForViewers(key);
         return sendJson(res, 200, { ok: true });
@@ -363,6 +391,30 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { ok: true });
       }
       return sendJson(res, 405, { error: 'method not allowed' });
+    }
+
+    // ---- viewer join: /j/<code>/... ----
+    if (parts[0] === 'j' && parts.length >= 2) {
+      const code = (parts[1] || '').toLowerCase();
+      const jdeck = /^[a-z0-9]{6}$/.test(code) ? db.getDeckByCode(code) : null;
+      if (!jdeck) {
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        if (!auth.rateLimit(`join:${ip}`, 30, 60e3))
+          return sendHtml(res, 429, '<h1>429</h1><p>Too many tries — wait a minute.</p>');
+        return sendHtml(
+          res,
+          404,
+          '<h1>Invalid or expired code</h1><p>Check the code with the presenter, or see <a href="/">live presentations</a>.</p>'
+        );
+      }
+      if (parts.length === 2) {
+        if (!url.pathname.endsWith('/')) return redirect(res, url.pathname + '/');
+        return serveFile(res, PUBLIC, '/index.html');
+      }
+      if (parts[2] === 'slides.json' && parts.length === 3) return sendJson(res, 200, slideFiles(jdeck));
+      if (parts[2] === 'slides' && parts.length === 4 && IMG.test(parts[3]))
+        return serveFile(res, deckDir(jdeck), `/${parts[3]}`);
+      return sendHtml(res, 404, '<h1>404</h1>');
     }
 
     // ---- deck pages + slide files: /<handle>/<deck>/... ----
@@ -405,16 +457,26 @@ const server = http.createServer(async (req, res) => {
 const wss = new WebSocketServer({ server, path: '/sync' });
 
 wss.on('connection', (ws, req) => {
-  const deckParam = new URL(req.url, 'http://localhost').searchParams.get('deck') || '';
-  const [handle, slug] = deckParam.split('/');
-  const deck = handle && slug ? db.getDeckByPath(handle, slug) : null;
+  const params = new URL(req.url, 'http://localhost').searchParams;
+  const codeParam = (params.get('code') || '').toLowerCase();
+  const deckParam = params.get('deck') || '';
   const user = auth.currentUser(req);
 
-  if (!deck || deck.status !== 'ready') return ws.close(4004, 'unknown deck');
+  let deck = null;
+  if (codeParam) {
+    // viewer joining with a session code
+    deck = db.getDeckByCode(codeParam);
+    if (!deck) return ws.close(4004, 'invalid or expired code');
+  } else {
+    // presenter channel: /<handle>/<slug> + session cookie + ownership
+    const [handle, slug] = deckParam.split('/');
+    deck = handle && slug ? db.getDeckByPath(handle, slug) : null;
+    if (!deck || deck.status !== 'ready') return ws.close(4004, 'unknown deck');
+    if (!user || user.id !== deck.user_id) return ws.close(4003, 'presenter must own the deck');
+  }
 
   ws.deck = `${deck.handle}/${deck.slug}`;
-  ws.isPresenter = !!user && user.id === deck.user_id;
-  if (!deck.live && !ws.isPresenter) return ws.close(4003, 'deck is not live');
+  ws.isPresenter = !codeParam && !!user && user.id === deck.user_id;
 
   clients.add(ws);
   send(ws, { type: 'state', index: deckIndex.get(ws.deck) || 0, role: ws.isPresenter ? 'presenter' : 'viewer' });

@@ -53,6 +53,13 @@ db.exec(`
   );
 `);
 
+// join-code column (added after initial release — migrate in place)
+try {
+  db.prepare('SELECT code FROM decks LIMIT 0');
+} catch {
+  db.exec('ALTER TABLE decks ADD COLUMN code TEXT');
+}
+
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
 // --- users ---
@@ -167,13 +174,22 @@ const qDeckByPath = db.prepare(`
   SELECT d.*, u.handle FROM decks d JOIN users u ON u.id = d.user_id
   WHERE u.handle = ? AND d.slug = ?
 `);
-const qDecksForUser = db.prepare('SELECT * FROM decks WHERE user_id = ? ORDER BY created_at DESC');
+const qDecksForUser = db.prepare(`
+  SELECT d.*, u.handle FROM decks d JOIN users u ON u.id = d.user_id
+  WHERE d.user_id = ? ORDER BY d.created_at DESC
+`);
 const qDeckSlugTaken = db.prepare(`
   SELECT 1 FROM decks d JOIN users u ON u.id = d.user_id WHERE u.handle = ? AND d.slug = ?
 `);
 const qSetDeckReady = db.prepare("UPDATE decks SET status = 'ready', slide_count = ?, error = NULL WHERE id = ?");
 const qSetDeckError = db.prepare("UPDATE decks SET status = 'error', error = ? WHERE id = ?");
 const qSetDeckLive = db.prepare('UPDATE decks SET live = ? WHERE id = ?');
+const qSetDeckCode = db.prepare('UPDATE decks SET code = ? WHERE id = ?');
+const qDeckByCode = db.prepare(`
+  SELECT d.*, u.handle FROM decks d JOIN users u ON u.id = d.user_id
+  WHERE d.code = ? AND d.live = 1 AND d.status = 'ready'
+`);
+const qCodeInUse = db.prepare('SELECT 1 FROM decks WHERE live = 1 AND code = ?');
 const qDeleteDeck = db.prepare('DELETE FROM decks WHERE id = ?');
 const qLiveDecks = db.prepare(`
   SELECT d.slug, d.title, d.slide_count, u.handle, u.email
@@ -207,6 +223,9 @@ module.exports = {
   setDeckReady: (id, count) => qSetDeckReady.run(count, id),
   setDeckError: (id, error) => qSetDeckError.run(error, id),
   setDeckLive: (id, live) => qSetDeckLive.run(live ? 1 : 0, id),
+  setDeckCode: (id, code) => qSetDeckCode.run(code, id),
+  getDeckByCode: (code) => qDeckByCode.get(code),
+  codeInUse: (code) => !!qCodeInUse.get(code),
   deleteDeck: (id) => qDeleteDeck.run(id),
   liveDecks: () => qLiveDecks.all(),
 };

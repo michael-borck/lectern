@@ -46,6 +46,11 @@
         <div class="meta">
           <div class="title">${esc(d.title)}${d.live ? '<span class="livebadge">LIVE</span>' : ''}</div>
           <div class="sub2">${state} · /${esc(d.handle)}/${esc(d.slug)}</div>
+          ${
+            d.live && d.code
+              ? `<div class="sub2">join code <b style="color:#eee;letter-spacing:.2em">${esc(d.code)}</b> · <a href="${d.join_url}" style="color:#6cf">${d.join_url}</a></div>`
+              : ''
+          }
           <div class="actions">
             ${mainBtn}
             <button class="delbtn" data-del="${d.id}" title="Delete deck">✕</button>

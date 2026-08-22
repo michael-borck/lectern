@@ -95,6 +95,7 @@
       display: block;
       aspect-ratio: 16 / 9;
       background: #000;
+      cursor: default;
     }
     .thumb img {
       width: 100%;
@@ -162,6 +163,46 @@
       padding: 7px 14px;
     }
     nav a:hover { background: #3a3a41; }
+
+    /* join box */
+    #join {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin: 2.4em auto 0;
+      max-width: 26em;
+    }
+    #join input {
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid #3a3a41;
+      background: #141416;
+      color: #eee;
+      font: 700 1.15em ui-monospace, monospace;
+      letter-spacing: 0.3em;
+      text-transform: lowercase;
+      text-align: center;
+    }
+    #join input:focus { outline: none; border-color: #6cf; }
+    #join button {
+      padding: 12px 22px;
+      border: none;
+      border-radius: 8px;
+      background: #b00;
+      color: #fff;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #join button:hover { background: #d00; }
+    #join-error {
+      text-align: center;
+      color: #ff9b9b;
+      font-size: 0.88em;
+      margin: 8px 0 0;
+      min-height: 1.2em;
+    }
   </style>
 </head>
 <body>
@@ -181,12 +222,29 @@
     </div>
   </header>
 
+  <form id="join" autocomplete="off">
+    <input id="join-code" maxlength="6" placeholder="join code" aria-label="join code">
+    <button type="submit">Join</button>
+  </form>
+  <p id="join-error"></p>
+
   <h2>Live now</h2>
   <div id="decks"><p class="empty">Loading…</p></div>
 
   <script>
     const esc = (s) =>
       String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    // join with a session code
+    document.getElementById('join').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const code = document.getElementById('join-code').value.trim().toLowerCase();
+      if (!/^[a-z0-9]{6}$/.test(code)) {
+        document.getElementById('join-error').textContent = 'Codes are 6 letters/digits — check with the presenter.';
+        return;
+      }
+      location.href = `/j/${code}/`;
+    });
 
     fetch('/api/me')
       .then((r) => r.json())
@@ -202,15 +260,11 @@
               .map(
                 (d) => `
         <div class="card">
-          <a class="thumb" href="${d.url}"><img src="${d.url}slides/${encodeURIComponent(
-                    d.thumb
-                  )}" alt="${esc(d.title)} first slide" loading="lazy"></a>
+          <div class="thumb"><img src="/api/thumb/${d.id}" alt="${esc(d.title)} first slide" loading="lazy"></div>
           <div class="meta">
             <div class="name">${esc(d.title)}<span class="livebadge">LIVE</span></div>
             <div class="count">by ${esc(d.handle)} · ${d.slides} slide${d.slides === 1 ? '' : 's'}</div>
-            <div class="links">
-              <a class="watch" href="${d.url}">Watch</a>
-            </div>
+            <div class="count" style="margin-top:6px">Join with the presenter’s code ↑</div>
           </div>
         </div>`
               )
