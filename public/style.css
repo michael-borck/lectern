@@ -182,6 +182,20 @@ html, body {
   font: inherit;
   opacity: 0.75;
 }
+/* key legend: subtle grey, only when it helps — hidden fullscreen & on touch */
+#hud #keys-hint {
+  color: #666;
+  margin-left: 12px;
+  white-space: nowrap;
+}
+:fullscreen #hud #keys-hint {
+  display: none;
+}
+@media (pointer: coarse) {
+  #hud #keys-hint {
+    display: none;
+  }
+}
 
 /* viewer free-browse catch-up pill */
 #catchup {
