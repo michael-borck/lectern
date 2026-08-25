@@ -13,11 +13,26 @@
     <div class="slides"></div>
   </div>
 
+  <canvas id="ink"></canvas>
+
   <div id="hud" hidden>
     <span id="conn" title="connected"></span><span id="badge">PRESENTER</span>
+    <span id="pen-badge" hidden>PEN · <kbd>p</kbd> exit · <kbd>c</kbd> clear</span>
+    <span id="blank-badge" hidden>BLANKED · <kbd>b</kbd> resume</span>
     <span id="viewers-wrap"><span id="viewers">0</span> watching</span>
     <button id="share-btn" type="button">Share</button>
     <button id="end-btn" type="button">End</button>
+  </div>
+
+  <button id="catchup" type="button" hidden></button>
+
+  <div id="blank-overlay" hidden></div>
+
+  <div id="waiting-overlay" hidden>
+    <div class="waiting-card">
+      <h1 id="waiting-title">The presentation hasn’t started yet</h1>
+      <p id="waiting-sub">The presenter will begin shortly.</p>
+    </div>
   </div>
 
   <div id="qr-overlay" hidden>

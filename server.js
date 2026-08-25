@@ -4,7 +4,7 @@
 //   /login                 passwordless email-code login
 //   /dashboard             your decks: upload (PDF/PPTX), present, stop, delete
 //   /<handle>/<deck>/      viewer URL — live decks only
-//   /<handle>/<deck>/?present   presenter view (owner only; QR overlay on "q")
+//   /<handle>/<deck>/?present   presenter view (owner only; keys: q QR · p pen · c clear ink · b blank · f fullscreen)
 //
 // Decks live in presentations/<handle>/<deck>/slide-*.png
 // Accounts/sessions/decks in data/lectern.db (SQLite)
@@ -27,7 +27,7 @@ const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
 const REVEAL = path.join(ROOT, 'node_modules/reveal.js/dist');
-const QRCODE_JS = path.join(ROOT, 'node_modules/qrcode-generator/dist/qrcode.js');
+const QRCODE_DIST = path.join(ROOT, 'node_modules/qrcode-generator/dist');
 const DECKS_DIR = process.env.DECKS_DIR || path.join(ROOT, 'presentations');
 
 const SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -165,7 +165,18 @@ function deckVisibleTo(deck, user) {
 // --- sync state (per deck, keyed "handle/slug") ---
 
 const clients = new Set();
-const deckIndex = new Map();
+const deckState = new Map(); // key -> { index, blank } (ink is ephemeral: relayed, never stored)
+
+function stateFor(key) {
+  let s = deckState.get(key);
+  if (!s) deckState.set(key, (s = { index: 0, blank: false }));
+  return s;
+}
+
+function presenterOnline(key) {
+  for (const c of clients) if (c.deck === key && c.isPresenter) return true;
+  return false;
+}
 
 function send(ws, msg) {
   if (ws.readyState === 1) ws.send(JSON.stringify(msg));
@@ -255,7 +266,7 @@ const server = http.createServer(async (req, res) => {
   try {
     // ---- statics ----
     if (url.pathname.startsWith('/reveal/')) return serveFile(res, REVEAL, url.pathname.slice('/reveal'.length));
-    if (url.pathname === '/qrcode.js') return serveFile(res, QRCODE_JS, '/');
+    if (url.pathname === '/qrcode.js') return serveFile(res, QRCODE_DIST, '/qrcode.js');
     if (['/viewer.js', '/style.css', '/dashboard.js', '/favicon.ico'].includes(url.pathname))
       return serveFile(res, PUBLIC, url.pathname);
 
@@ -379,7 +390,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'POST' && action === 'stop') {
         db.setDeckLive(deck.id, false);
         db.setDeckCode(deck.id, null);
-        deckIndex.delete(key);
+        deckState.delete(key);
         endDeckForViewers(key);
         return sendJson(res, 200, { ok: true });
       }
@@ -479,7 +490,15 @@ wss.on('connection', (ws, req) => {
   ws.isPresenter = !codeParam && !!user && user.id === deck.user_id;
 
   clients.add(ws);
-  send(ws, { type: 'state', index: deckIndex.get(ws.deck) || 0, role: ws.isPresenter ? 'presenter' : 'viewer' });
+  const st = stateFor(ws.deck);
+  send(ws, {
+    type: 'state',
+    index: st.index,
+    blank: st.blank,
+    presenter: presenterOnline(ws.deck),
+    role: ws.isPresenter ? 'presenter' : 'viewer',
+  });
+  if (ws.isPresenter) broadcastDeck(ws.deck, { type: 'presenter', connected: true }, ws);
   broadcastViewerCount(ws.deck);
 
   ws.on('message', (data) => {
@@ -490,14 +509,24 @@ wss.on('connection', (ws, req) => {
     } catch {
       return;
     }
+    const st = stateFor(ws.deck);
     if (msg.type === 'goto' && Number.isInteger(msg.index) && msg.index >= 0) {
-      deckIndex.set(ws.deck, msg.index);
+      st.index = msg.index;
       broadcastDeck(ws.deck, { type: 'goto', index: msg.index }, ws);
+    } else if (msg.type === 'blank') {
+      st.blank = !!msg.on;
+      broadcastDeck(ws.deck, { type: 'blank', on: st.blank }, ws);
+    } else if (msg.type === 'ink' && Number.isInteger(msg.slide) && Array.isArray(msg.pts) && msg.pts.length <= 2000) {
+      // relay only — ink is ephemeral and kept client-side per slide
+      broadcastDeck(ws.deck, { type: 'ink', id: msg.id, slide: msg.slide, color: msg.color, width: msg.width, pts: msg.pts, done: !!msg.done }, ws);
+    } else if (msg.type === 'ink-clear' && Number.isInteger(msg.slide)) {
+      broadcastDeck(ws.deck, { type: 'ink-clear', slide: msg.slide }, ws); // slide -1 = all slides
     }
   });
 
   ws.on('close', () => {
     clients.delete(ws);
+    if (ws.isPresenter && !presenterOnline(ws.deck)) broadcastDeck(ws.deck, { type: 'presenter', connected: false });
     broadcastViewerCount(ws.deck);
   });
 

@@ -33,6 +33,10 @@ html, body {
   display: flex;
   align-items: center;
 }
+/* display:flex above beats the UA's [hidden] rule — restore hiding for viewers */
+#hud[hidden] {
+  display: none;
+}
 #hud #badge {
   background: #b00;
   color: #fff;
@@ -143,4 +147,91 @@ html, body {
 }
 .ended-card a {
   color: #6cf;
+}
+
+/* ink canvas: above slides, below HUD; inert unless pen is on (presenter) */
+#ink {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+#ink.on {
+  pointer-events: auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* presenter state pills in the HUD */
+#hud #pen-badge,
+#hud #blank-badge {
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-right: 8px;
+  letter-spacing: 0.08em;
+}
+#hud #pen-badge {
+  background: #2656c7;
+  color: #fff;
+}
+#hud #blank-badge {
+  background: #555;
+  color: #fff;
+}
+#hud kbd {
+  font: inherit;
+  opacity: 0.75;
+}
+
+/* viewer free-browse catch-up pill */
+#catchup {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  background: #2c2c31;
+  color: #eee;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font: 13px system-ui, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+#catchup:hover {
+  background: #3a3a41;
+}
+
+/* blank screen (viewers): presenter pressed b */
+#blank-overlay {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 45;
+}
+#blank-overlay[hidden] {
+  display: none;
+}
+
+/* waiting screen (viewers): no presenter connected */
+#waiting-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 46;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#waiting-overlay[hidden] {
+  display: none;
+}
+.waiting-card {
+  text-align: center;
+  font: 16px/1.6 system-ui, sans-serif;
+  color: #eee;
+}
+.waiting-card p {
+  color: #888;
 }

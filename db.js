@@ -192,7 +192,7 @@ const qDeckByCode = db.prepare(`
 const qCodeInUse = db.prepare('SELECT 1 FROM decks WHERE live = 1 AND code = ?');
 const qDeleteDeck = db.prepare('DELETE FROM decks WHERE id = ?');
 const qLiveDecks = db.prepare(`
-  SELECT d.slug, d.title, d.slide_count, u.handle, u.email
+  SELECT d.*, u.handle
   FROM decks d JOIN users u ON u.id = d.user_id
   WHERE d.live = 1 AND d.status = 'ready'
   ORDER BY d.created_at DESC
