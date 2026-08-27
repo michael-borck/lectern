@@ -4,7 +4,7 @@
 //   /login                 passwordless email-code login
 //   /dashboard             your decks: upload (PDF/PPTX), present, stop, delete
 //   /<handle>/<deck>/      viewer URL — live decks only
-//   /<handle>/<deck>/?present   presenter view (owner only; keys: q QR · p pen · c clear ink · b blank · f fullscreen)
+//   /<handle>/<deck>/?present   presenter view (owner only; keys: q join panel · Q QR overlay · p pen · c clear ink · b blank · f fullscreen)
 //
 // Decks live in presentations/<handle>/<deck>/slide-*.png
 // Accounts/sessions/decks in data/lectern.db (SQLite)

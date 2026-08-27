@@ -283,13 +283,28 @@
     const qr = qrcode(0, 'M');
     qr.addData(joinUrl);
     qr.make();
-    document.getElementById('qr-img').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
+    const qrSvg = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
+    document.getElementById('qr-img').innerHTML = qrSvg;
     document.getElementById('qr-code').textContent = code || '';
     document.getElementById('qr-url').textContent = joinUrl;
 
     const toggleQr = () => (qrOverlay.hidden = !qrOverlay.hidden);
     document.getElementById('share-btn').addEventListener('click', toggleQr);
     qrOverlay.addEventListener('click', toggleQr);
+
+    // QR join panel (lowercase q): same code in a persistent left column;
+    // body gets a left margin so reveal rescales the slide into the right side
+    const qrPanel = document.getElementById('qr-panel');
+    document.getElementById('qr-panel-img').innerHTML = qrSvg;
+    document.getElementById('qr-panel-code').textContent = code || '';
+    document.getElementById('qr-panel-url').textContent = joinUrl;
+
+    const toggleQrPanel = () => {
+      qrPanel.hidden = !qrPanel.hidden;
+      document.body.classList.toggle('qr-split', !qrPanel.hidden);
+      Reveal.layout(); // slide box moved — rescale, then re-align ink
+      redrawInk();
+    };
 
     document.getElementById('end-btn').addEventListener('click', async () => {
       if (!confirm('End this presentation for all viewers?')) return;
@@ -300,7 +315,8 @@
     });
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'q') toggleQr();
+      if (e.key === 'q') toggleQrPanel(); // lowercase: persistent join column
+      if (e.key === 'Q') toggleQr(); // uppercase (shift): full-screen share
       if (e.key === 'f' && qrOverlay.hidden) {
         if (document.fullscreenElement) document.exitFullscreen();
         else document.documentElement.requestFullscreen();

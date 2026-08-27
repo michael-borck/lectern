@@ -22,7 +22,7 @@
     <span id="viewers-wrap"><span id="viewers">0</span> watching</span>
     <button id="share-btn" type="button">Share</button>
     <button id="end-btn" type="button">End</button>
-    <span id="keys-hint"><kbd>b</kbd> blank · <kbd>p</kbd> pen · <kbd>c</kbd> clear · <kbd>q</kbd> share · <kbd>f</kbd> full</span>
+    <span id="keys-hint"><kbd>b</kbd> blank · <kbd>p</kbd> pen · <kbd>c</kbd> clear · <kbd>q</kbd> join · <kbd>Q</kbd> share · <kbd>f</kbd> full</span>
   </div>
 
   <button id="catchup" type="button" hidden></button>
@@ -41,9 +41,19 @@
       <div id="qr-img"></div>
       <p id="qr-code"></p>
       <p id="qr-url"></p>
-      <p class="hint">Scan, share the link, or type the code — <kbd>q</kbd> to toggle</p>
+      <p class="hint">Scan, share the link, or type the code — <kbd>Q</kbd> to toggle</p>
     </div>
   </div>
+
+  <aside id="qr-panel" hidden>
+    <div id="qr-panel-card">
+      <h2>Join in</h2>
+      <div id="qr-panel-img"></div>
+      <p id="qr-panel-code"></p>
+      <p id="qr-panel-url"></p>
+      <p class="hint"><kbd>q</kbd> to close · <kbd>Q</kbd> for the big code</p>
+    </div>
+  </aside>
 
   <div id="ended-overlay" hidden>
     <div class="ended-card">
