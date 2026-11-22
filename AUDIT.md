@@ -99,7 +99,7 @@ LibreOffice converting untrusted files as root is the highest-value target.
 - [ ] `npm test` + `node:test` integration suite (bad cookie, live.json projection,
       open redirect, single-use code).
 - [ ] GitHub Actions: `node --check`, `npm ci`, `npm audit --omit=dev`.
-- [ ] Rebase/merge the one-commit-behind upstream (MIT license).
+- [x] Merge the one-commit-behind upstream (MIT license) — merged as 6777a98.
 
 ### L5 — Open redirect after sign-in
 `next` accepted `//evil.com` and `/\evil.com`.
