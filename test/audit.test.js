@@ -1,6 +1,7 @@
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { spawn, spawnSync } = require('node:child_process');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -39,6 +40,12 @@ let base = '';
 let port = 0;
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function inlineHash(html) {
+  const m = html.match(/<script>([\s\S]*?)<\/script>/);
+  assert.ok(m, 'expected an inline script');
+  return `sha256-${crypto.createHash('sha256').update(m[1], 'utf8').digest('base64')}`;
+}
 
 function waitFor(re, timeout = 8000) {
   const start = Date.now();
@@ -119,6 +126,33 @@ test('security headers are set on responses', async () => {
   assert.equal(r.headers.get('x-frame-options'), 'DENY');
   assert.equal(r.headers.get('referrer-policy'), 'no-referrer');
   assert.match(r.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+});
+
+test('HTML pages use a hash-based script CSP', async () => {
+  const pages = [
+    ['/login', {}],
+    ['/dashboard', { cookie: `lectern_session=${TOKEN}` }],
+    ['/', {}],
+    ['/j/abcdef/', {}],
+  ];
+  for (const [page, headers] of pages) {
+    const r = await fetch(`${base}${page}`, { headers, redirect: 'manual' });
+    const csp = r.headers.get('content-security-policy');
+    assert.ok(csp, `missing CSP for ${page}`);
+    assert.ok(!/script-src[^;]*'unsafe-inline'/.test(csp), `unsafe-inline script for ${page}`);
+    assert.match(csp, /frame-ancestors 'none'/);
+  }
+
+  const login = fs.readFileSync(path.join(ROOT, 'public/login.html'), 'utf8');
+  let csp = (await fetch(`${base}/login`)).headers.get('content-security-policy');
+  assert.ok(csp.includes(`'${inlineHash(login)}'`), 'login inline script hash missing');
+
+  const decks = fs.readFileSync(path.join(ROOT, 'public/decks.html'), 'utf8');
+  csp = (await fetch(`${base}/`)).headers.get('content-security-policy');
+  assert.ok(csp.includes(`'${inlineHash(decks)}'`), 'decks inline script hash missing');
+
+  csp = (await fetch(`${base}/j/abcdef/`)).headers.get('content-security-policy');
+  assert.match(csp, /script-src 'self'(?:;|$)/, 'viewer page should not need script hashes');
 });
 
 test('/healthz reports ok', async () => {

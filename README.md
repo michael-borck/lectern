@@ -83,7 +83,9 @@ docker compose up -d --build
 ```
 
 The container runs unprivileged because LibreOffice converts untrusted uploads.
-Put TLS in front (Caddy) and keep `3100` private.
+Put TLS in front (Caddy) and keep `3100` private. Responses carry a strict CSP:
+inline scripts are allowed only by SHA-256 hash, so editing an inline script
+without updating the served hash will make the browser refuse to run it.
 
 Bare metal: `deploy/lectern.service` runs as the `lectern` user; create it and
 `chown` the app directory first (instructions in the unit file).
