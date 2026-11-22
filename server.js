@@ -98,6 +98,14 @@ const MIME = {
   '.woff2': 'font/woff2',
 };
 
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'no-referrer',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Content-Security-Policy': "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+};
+
 // --- helpers ---
 
 function sendJson(res, code, obj) {
@@ -365,6 +373,7 @@ const server = http.createServer(async (req, res) => {
     return res.end('bad request');
   }
   const parts = url.pathname.split('/').filter(Boolean);
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name, value);
   let user = null;
   try {
     user = auth.currentUser(req);
@@ -373,6 +382,16 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    // ---- health ----
+    if (url.pathname === '/healthz') {
+      try {
+        db.db.prepare('SELECT 1').get();
+        return sendJson(res, 200, { ok: true });
+      } catch {
+        return sendJson(res, 503, { ok: false });
+      }
+    }
+
     // ---- statics ----
     if (url.pathname.startsWith('/reveal/')) return serveFile(res, REVEAL, url.pathname.slice('/reveal'.length));
     if (url.pathname === '/qrcode.js') return serveFile(res, QRCODE_DIST, '/qrcode.js');

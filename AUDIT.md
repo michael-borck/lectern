@@ -82,23 +82,23 @@ LibreOffice converting untrusted files as root is the highest-value target.
 - [x] Validate relayed `ink` fields (numeric slide/width, hex color, point shapes).
 
 ### L2 — Response headers
-- [ ] `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`,
-      `X-Frame-Options: DENY` (or `frame-ancestors 'none'`).
+- [x] `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`,
+      `X-Frame-Options: DENY` + `frame-ancestors 'none'`.
 - [ ] CSP with nonces/hashes for the inline scripts (follow-up).
-- [ ] HSTS at the proxy.
+- [x] HSTS at the proxy (`deploy/Caddyfile`).
 
 ### L3 — Auth & ops hygiene
-- [ ] `crypto.timingSafeEqual` for the login-code hash compare.
-- [ ] Fail closed when `NODE_ENV=production` and `EMAIL_PROVIDER=dev`.
-- [ ] `/healthz` route + compose healthcheck.
-- [ ] Remove dev-provider code logging from production paths.
+- [x] `crypto.timingSafeEqual` for the login-code hash compare.
+- [x] Fail closed when `NODE_ENV=production` and `EMAIL_PROVIDER=dev`.
+- [x] `/healthz` route + compose healthcheck.
+- [x] Remove dev-provider code logging from production paths (dev can't start in prod).
 
 ### L4 — Repo hygiene
-- [ ] `package.json` license → MIT to match `LICENSE`.
+- [x] `package.json` license → MIT to match `LICENSE`.
 - [x] README (setup, env, deploy).
-- [ ] `npm test` + `node:test` integration suite (bad cookie, live.json projection,
-      open redirect, single-use code).
-- [ ] GitHub Actions: `node --check`, `npm ci`, `npm audit --omit=dev`.
+- [x] `npm test` + `node:test` suite: headers, healthz, bad cookie, live.json
+      projection, single-use code, open-redirect guard, WS origin/size, ink, restart.
+- [x] GitHub Actions: `node --check`, `npm ci`, `npm audit --omit=dev`.
 - [x] Merge the one-commit-behind upstream (MIT license) — merged as 6777a98.
 
 ### L5 — Open redirect after sign-in
@@ -110,4 +110,4 @@ LibreOffice converting untrusted files as root is the highest-value target.
 
 - Phase 1 (done): M1, M2, M3, M5 — availability, abuse, and container safety.
 - Phase 2 (done): M4, L1 — correctness.
-- Phase 3 (next): L2, L3, L4 — hardening and hygiene.
+- Phase 3 (done): L2, L3, L4 — hardening and hygiene.

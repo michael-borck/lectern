@@ -120,6 +120,13 @@ const qClearCode = db.prepare('DELETE FROM login_codes WHERE email = ?');
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 
+// constant-time comparison of two SHA-256 hex digests
+function digestsEqual(a, b) {
+  const ba = Buffer.from(String(a), 'hex');
+  const bb = Buffer.from(String(b), 'hex');
+  return ba.length === bb.length && crypto.timingSafeEqual(ba, bb);
+}
+
 function setLoginCode(email, code) {
   qSetCode.run(email, sha256(code), Date.now() + CODE_TTL_MS);
 }
@@ -136,7 +143,7 @@ function checkLoginCode(email, code) {
     qClearCode.run(email);
     return false;
   }
-  if (row.code_hash === sha256(code)) {
+  if (digestsEqual(row.code_hash, sha256(code))) {
     qClearCode.run(email);
     return true;
   }

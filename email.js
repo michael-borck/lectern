@@ -8,6 +8,13 @@
 const PROVIDER = (process.env.EMAIL_PROVIDER || 'dev').toLowerCase();
 const FROM = process.env.EMAIL_FROM || 'lectern@localhost';
 
+// fail closed: never run with codes going to stdout in production
+if (PROVIDER === 'dev' && process.env.NODE_ENV === 'production') {
+  throw new Error(
+    'EMAIL_PROVIDER=dev is not allowed with NODE_ENV=production — set EMAIL_PROVIDER=smtp or resend'
+  );
+}
+
 async function sendSmtp(to, subject, text) {
   const nodemailer = require('nodemailer');
   const port = Number(process.env.SMTP_PORT || 587);

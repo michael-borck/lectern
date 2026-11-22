@@ -16,6 +16,7 @@ Docs: [AUDIT.md](./AUDIT.md) tracks the security/reliability audit and remediati
 ```sh
 npm ci
 npm start                 # http://localhost:3000
+npm test                  # node:test regression suite
 ```
 
 Requires `pdftoppm` (poppler) for PDFs and `soffice` (LibreOffice) for PPTX. The
