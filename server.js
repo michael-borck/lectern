@@ -33,6 +33,55 @@ const DECKS_DIR = process.env.DECKS_DIR || path.join(ROOT, 'presentations');
 const SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const IMG = /\.(png|jpe?g|webp)$/i;
 const MAX_UPLOAD = 50 * 1024 * 1024;
+const MAX_USER_BYTES = Number(process.env.MAX_USER_BYTES || 500 * 1024 * 1024);
+const MAX_DECK_BYTES = Number(process.env.MAX_DECK_BYTES || 200 * 1024 * 1024);
+
+// Only believe X-Forwarded-For when explicitly behind a trusted proxy,
+// otherwise clients can mint a fresh rate-limit key per request.
+const TRUST_PROXY = /^(1|true|yes)$/i.test(process.env.TRUST_PROXY || '');
+function clientIp(req) {
+  if (TRUST_PROXY) {
+    const xff = req.headers['x-forwarded-for'];
+    if (typeof xff === 'string' && xff) {
+      const first = xff.split(',')[0].trim();
+      if (first) return first;
+    }
+  }
+  return req.socket.remoteAddress || 'unknown';
+}
+
+const MAX_WS_PER_IP = Number(process.env.MAX_WS_PER_IP || 50);
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+function originAllowed(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true; // non-browser client; no cookie-driven CSRF surface
+  try {
+    const u = new URL(origin);
+    if (ALLOWED_ORIGINS.length) return ALLOWED_ORIGINS.includes(u.origin);
+    return u.host === req.headers.host;
+  } catch {
+    return false;
+  }
+}
+
+function validInk(msg) {
+  if (!Number.isInteger(msg.slide) || msg.slide < 0 || msg.slide > 100000) return false;
+  if (typeof msg.id !== 'string' || !msg.id || msg.id.length > 64) return false;
+  if (typeof msg.color !== 'string' || !/^#[0-9a-f]{3,8}$/i.test(msg.color)) return false;
+  if (typeof msg.width !== 'number' || !Number.isFinite(msg.width) || msg.width <= 0 || msg.width > 1)
+    return false;
+  if (!Array.isArray(msg.pts) || msg.pts.length > 2000) return false;
+  for (const p of msg.pts) {
+    if (!Array.isArray(p) || p.length !== 2) return false;
+    const [x, y] = p;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || x < -2 || x > 3 || y < -2 || y > 3) return false;
+  }
+  return true;
+}
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -125,6 +174,32 @@ function deckDir(deck) {
   return path.join(DECKS_DIR, deck.handle, deck.slug);
 }
 
+function dirBytes(dir) {
+  let total = 0;
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    try {
+      if (e.isDirectory()) total += dirBytes(p);
+      else total += fs.statSync(p).size;
+    } catch {
+      // raced with a concurrent delete — ignore
+    }
+  }
+  return total;
+}
+
+function userBytes(user) {
+  return db
+    .decksForUser(user.id)
+    .reduce((sum, d) => sum + dirBytes(path.join(DECKS_DIR, user.handle, d.slug)), 0);
+}
+
 function deckJson(deck) {
   const files = slideFiles(deck);
   return {
@@ -141,6 +216,15 @@ function deckJson(deck) {
     code: deck.live ? deck.code : undefined,
     join_url: deck.live && deck.code ? `/j/${deck.code}/` : undefined,
   };
+}
+
+// public projection: join codes are shared out-of-band by the presenter,
+// never handed to anonymous clients (e.g. /api/live.json)
+function publicDeckJson(deck) {
+  const d = deckJson(deck);
+  delete d.code;
+  delete d.join_url;
+  return d;
 }
 
 const slugify = (s) =>
@@ -167,9 +251,16 @@ function deckVisibleTo(deck, user) {
 const clients = new Set();
 const deckState = new Map(); // key -> { index, blank } (ink is ephemeral: relayed, never stored)
 
-function stateFor(key) {
+// seed from the deck row so a restart doesn't reset an in-progress talk.
+// accepts a deck row or an existing key (message-handler callers use the key).
+function stateFor(deckOrKey) {
+  const key = typeof deckOrKey === 'string' ? deckOrKey : `${deckOrKey.handle}/${deckOrKey.slug}`;
   let s = deckState.get(key);
-  if (!s) deckState.set(key, (s = { index: 0, blank: false }));
+  if (!s) {
+    const row = typeof deckOrKey === 'string' ? null : deckOrKey;
+    s = { index: row ? row.slide_index || 0 : 0, blank: row ? !!row.blank : false };
+    deckState.set(key, s);
+  }
   return s;
 }
 
@@ -202,7 +293,10 @@ function endDeckForViewers(key) {
 
 function parseUpload(req) {
   return new Promise((resolve, reject) => {
-    const bb = busboy({ headers: req.headers, limits: { fileSize: MAX_UPLOAD, files: 1 } });
+    const bb = busboy({
+      headers: req.headers,
+      limits: { fileSize: MAX_UPLOAD, files: 1, fields: 10, fieldSize: 1024, fieldNameSize: 100, parts: 20 },
+    });
     const fields = {};
     let fileInfo = null;
     let fileWritten = null;
@@ -252,16 +346,31 @@ function sniffKind(filePath) {
   fs.readSync(fd, head, 0, 4, 0);
   fs.closeSync(fd);
   if (head.toString('latin1') === '%PDF') return 'pdf';
-  if (head.readUInt32LE(0) === 0x04034b50) return 'pptx'; // zip (pptx/docx/xlsx)
+  if (head.readUInt32LE(0) === 0x04034b50) {
+    // a zip is only a deck if it actually carries a presentation part
+    const buf = fs.readFileSync(filePath);
+    return buf.includes(Buffer.from('ppt/presentation.xml')) ? 'pptx' : 'zip';
+  }
   return null;
 }
 
 // --- HTTP ---
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://localhost');
+  let url;
+  try {
+    url = new URL(req.url, 'http://localhost');
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    return res.end('bad request');
+  }
   const parts = url.pathname.split('/').filter(Boolean);
-  const user = auth.currentUser(req);
+  let user = null;
+  try {
+    user = auth.currentUser(req);
+  } catch {
+    // malformed auth cookie — treat as signed out rather than failing the request
+  }
 
   try {
     // ---- statics ----
@@ -287,7 +396,7 @@ const server = http.createServer(async (req, res) => {
       const emailAddr = (body?.email || '').trim().toLowerCase();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailAddr)) return sendJson(res, 400, { error: 'invalid email' });
       if (!auth.domainAllowed(emailAddr)) return sendJson(res, 403, { error: 'this email domain is not allowed' });
-      const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+      const ip = clientIp(req);
       if (!auth.rateLimit(`code:email:${emailAddr}`, 5, 3600e3) || !auth.rateLimit(`code:ip:${ip}`, 20, 3600e3))
         return sendJson(res, 429, { error: 'too many codes requested — try again later' });
       try {
@@ -321,7 +430,7 @@ const server = http.createServer(async (req, res) => {
       });
     }
     if (url.pathname === '/api/live.json') {
-      return sendJson(res, 200, db.liveDecks().map(deckJson));
+      return sendJson(res, 200, db.liveDecks().map(publicDeckJson));
     }
 
     // public thumbnail for home cards: first slide of a live deck only
@@ -342,6 +451,8 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'POST' && !idStr) {
         // upload
         if (!auth.rateLimit(`upload:${user.id}`, 20, 3600e3)) return sendJson(res, 429, { error: 'too many uploads' });
+        if (userBytes(user) >= MAX_USER_BYTES)
+          return sendJson(res, 413, { error: 'storage quota reached — delete a deck first' });
         let up;
         try {
           up = await parseUpload(req);
@@ -350,7 +461,7 @@ const server = http.createServer(async (req, res) => {
         }
         const kind = sniffKind(up.tmp);
         const ext = up.filename.toLowerCase();
-        const extOk = (kind === 'pdf' && ext.endsWith('.pdf')) || (kind === 'pptx' && (ext.endsWith('.pptx') || ext.endsWith('.ppt')));
+        const extOk = (kind === 'pdf' && ext.endsWith('.pdf')) || (kind === 'pptx' && ext.endsWith('.pptx'));
         if (!kind || !extOk) {
           fs.rmSync(up.tmp, { force: true });
           return sendJson(res, 400, { error: 'only PDF or PPTX files are accepted' });
@@ -363,7 +474,14 @@ const server = http.createServer(async (req, res) => {
         const deck = db.createDeck(user.id, slug, title);
         const outDir = deckDir({ handle: user.handle, slug });
         convert(up.tmp, kind, outDir)
-          .then((count) => db.setDeckReady(deck.id, count))
+          .then((count) => {
+            const bytes = dirBytes(outDir);
+            if (bytes > MAX_DECK_BYTES || userBytes(user) > MAX_USER_BYTES) {
+              fs.rmSync(outDir, { recursive: true, force: true });
+              throw new Error(`converted deck is too large (${Math.round(bytes / 1024 / 1024)} MB)`);
+            }
+            db.setDeckReady(deck.id, count);
+          })
           .catch((e) => {
             console.error(`convert deck ${deck.id} failed:`, e.message);
             db.setDeckError(deck.id, e.message);
@@ -380,6 +498,9 @@ const server = http.createServer(async (req, res) => {
         const code = genCode();
         db.setDeckCode(deck.id, code);
         db.setDeckLive(deck.id, true);
+        db.setDeckIndex(deck.id, 0);
+        db.setDeckBlank(deck.id, 0);
+        deckState.delete(key);
         return sendJson(res, 200, {
           ok: true,
           url: `/${deck.handle}/${deck.slug}/`,
@@ -390,12 +511,15 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'POST' && action === 'stop') {
         db.setDeckLive(deck.id, false);
         db.setDeckCode(deck.id, null);
+        db.setDeckIndex(deck.id, 0);
+        db.setDeckBlank(deck.id, 0);
         deckState.delete(key);
         endDeckForViewers(key);
         return sendJson(res, 200, { ok: true });
       }
       if (req.method === 'DELETE' && !action) {
         db.setDeckLive(deck.id, false);
+        deckState.delete(key);
         endDeckForViewers(key);
         db.deleteDeck(deck.id);
         fs.rmSync(deckDir(deck), { recursive: true, force: true });
@@ -409,7 +533,7 @@ const server = http.createServer(async (req, res) => {
       const code = (parts[1] || '').toLowerCase();
       const jdeck = /^[a-z0-9]{6}$/.test(code) ? db.getDeckByCode(code) : null;
       if (!jdeck) {
-        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const ip = clientIp(req);
         if (!auth.rateLimit(`join:${ip}`, 30, 60e3))
           return sendHtml(res, 429, '<h1>429</h1><p>Too many tries — wait a minute.</p>');
         return sendHtml(
@@ -465,13 +589,47 @@ const server = http.createServer(async (req, res) => {
 
 // --- WebSocket sync ---
 
-const wss = new WebSocketServer({ server, path: '/sync' });
+const wss = new WebSocketServer({
+  server,
+  path: '/sync',
+  maxPayload: 64 * 1024,
+  // reject cross-origin handshakes before the upgrade completes
+  verifyClient: (info, done) => {
+    if (!originAllowed(info.req)) return done(false, 403, 'origin not allowed');
+    done(true);
+  },
+});
+const wsPerIp = new Map();
 
 wss.on('connection', (ws, req) => {
+  if (!originAllowed(req)) return ws.close(4003, 'origin not allowed');
+
+  const ip = clientIp(req);
+  const open = wsPerIp.get(ip) || 0;
+  if (open >= MAX_WS_PER_IP) return ws.close(4029, 'too many connections');
+  wsPerIp.set(ip, open + 1);
+
+  // release the per-IP slot even if we reject before the main close handler is wired
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    const left = (wsPerIp.get(ip) || 1) - 1;
+    if (left <= 0) wsPerIp.delete(ip);
+    else wsPerIp.set(ip, left);
+  };
+  ws.on('close', release);
+  ws.on('error', release);
+
   const params = new URL(req.url, 'http://localhost').searchParams;
   const codeParam = (params.get('code') || '').toLowerCase();
   const deckParam = params.get('deck') || '';
-  const user = auth.currentUser(req);
+  let user = null;
+  try {
+    user = auth.currentUser(req);
+  } catch {
+    // malformed auth cookie — treat as signed out
+  }
 
   let deck = null;
   if (codeParam) {
@@ -490,7 +648,7 @@ wss.on('connection', (ws, req) => {
   ws.isPresenter = !codeParam && !!user && user.id === deck.user_id;
 
   clients.add(ws);
-  const st = stateFor(ws.deck);
+  const st = stateFor(deck);
   send(ws, {
     type: 'state',
     index: st.index,
@@ -510,16 +668,18 @@ wss.on('connection', (ws, req) => {
       return;
     }
     const st = stateFor(ws.deck);
-    if (msg.type === 'goto' && Number.isInteger(msg.index) && msg.index >= 0) {
+    if (msg.type === 'goto' && Number.isInteger(msg.index) && msg.index >= 0 && msg.index <= 100000) {
       st.index = msg.index;
+      db.setDeckIndex(deck.id, msg.index);
       broadcastDeck(ws.deck, { type: 'goto', index: msg.index }, ws);
     } else if (msg.type === 'blank') {
       st.blank = !!msg.on;
+      db.setDeckBlank(deck.id, st.blank);
       broadcastDeck(ws.deck, { type: 'blank', on: st.blank }, ws);
-    } else if (msg.type === 'ink' && Number.isInteger(msg.slide) && Array.isArray(msg.pts) && msg.pts.length <= 2000) {
+    } else if (msg.type === 'ink' && validInk(msg)) {
       // relay only — ink is ephemeral and kept client-side per slide
       broadcastDeck(ws.deck, { type: 'ink', id: msg.id, slide: msg.slide, color: msg.color, width: msg.width, pts: msg.pts, done: !!msg.done }, ws);
-    } else if (msg.type === 'ink-clear' && Number.isInteger(msg.slide)) {
+    } else if (msg.type === 'ink-clear' && Number.isInteger(msg.slide) && msg.slide >= -1 && msg.slide <= 100000) {
       broadcastDeck(ws.deck, { type: 'ink-clear', slide: msg.slide }, ws); // slide -1 = all slides
     }
   });

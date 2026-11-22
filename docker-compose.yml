@@ -15,8 +15,19 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
+      # Caddy sits in front on the host. Set TRUST_PROXY=true only if port 3100
+      # is firewalled so only the proxy can reach it — otherwise XFF is spoofable.
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      MAX_WS_PER_IP: ${MAX_WS_PER_IP:-50}
+      MAX_USER_BYTES: ${MAX_USER_BYTES:-524288000}
+      MAX_DECK_BYTES: ${MAX_DECK_BYTES:-209715200}
+      MAX_RATE_BUCKETS: ${MAX_RATE_BUCKETS:-50000}
+    # LibreOffice on untrusted uploads: cap the blast radius
+    mem_limit: 2g
     volumes:
-      # decks land here via upload (read-write on purpose)
+      # decks land here via upload (read-write on purpose);
+      # the container runs as uid 1000: chown -R 1000:1000 presentations data
       - ./presentations:/app/presentations
       # SQLite: users, sessions, deck registry
       - ./data:/app/data

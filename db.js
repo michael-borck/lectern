@@ -48,16 +48,29 @@ db.exec(`
     status      TEXT NOT NULL DEFAULT 'converting',  -- converting | ready | error
     error       TEXT,
     live        INTEGER NOT NULL DEFAULT 0,
+    code        TEXT,
+    slide_index INTEGER NOT NULL DEFAULT 0,
+    blank       INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE (user_id, slug)
   );
 `);
 
-// join-code column (added after initial release — migrate in place)
+// join-code + presenter-position columns (added after initial release — migrate in place)
 try {
   db.prepare('SELECT code FROM decks LIMIT 0');
 } catch {
   db.exec('ALTER TABLE decks ADD COLUMN code TEXT');
+}
+try {
+  db.prepare('SELECT slide_index FROM decks LIMIT 0');
+} catch {
+  db.exec('ALTER TABLE decks ADD COLUMN slide_index INTEGER NOT NULL DEFAULT 0');
+}
+try {
+  db.prepare('SELECT blank FROM decks LIMIT 0');
+} catch {
+  db.exec('ALTER TABLE decks ADD COLUMN blank INTEGER NOT NULL DEFAULT 0');
 }
 
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
@@ -70,7 +83,7 @@ const qHandleTaken = db.prepare('SELECT 1 FROM users WHERE handle = ?');
 const qInsertUser = db.prepare('INSERT INTO users (email, handle) VALUES (?, ?)');
 
 const HANDLE_RESERVED = new Set([
-  'reveal', 'sync', 'login', 'dashboard', 'api', 'decks.json', 'live.json',
+  'j', 'reveal', 'sync', 'login', 'dashboard', 'api', 'decks.json', 'live.json',
   'viewer.js', 'style.css', 'qrcode.js', 'dashboard.js', 'favicon.ico',
 ]);
 
@@ -185,6 +198,8 @@ const qSetDeckReady = db.prepare("UPDATE decks SET status = 'ready', slide_count
 const qSetDeckError = db.prepare("UPDATE decks SET status = 'error', error = ? WHERE id = ?");
 const qSetDeckLive = db.prepare('UPDATE decks SET live = ? WHERE id = ?');
 const qSetDeckCode = db.prepare('UPDATE decks SET code = ? WHERE id = ?');
+const qSetDeckIndex = db.prepare('UPDATE decks SET slide_index = ? WHERE id = ?');
+const qSetDeckBlank = db.prepare('UPDATE decks SET blank = ? WHERE id = ?');
 const qDeckByCode = db.prepare(`
   SELECT d.*, u.handle FROM decks d JOIN users u ON u.id = d.user_id
   WHERE d.code = ? AND d.live = 1 AND d.status = 'ready'
@@ -224,6 +239,8 @@ module.exports = {
   setDeckError: (id, error) => qSetDeckError.run(error, id),
   setDeckLive: (id, live) => qSetDeckLive.run(live ? 1 : 0, id),
   setDeckCode: (id, code) => qSetDeckCode.run(code, id),
+  setDeckIndex: (id, index) => qSetDeckIndex.run(index, id),
+  setDeckBlank: (id, blank) => qSetDeckBlank.run(blank ? 1 : 0, id),
   getDeckByCode: (code) => qDeckByCode.get(code),
   codeInUse: (code) => !!qCodeInUse.get(code),
   deleteDeck: (id) => qDeleteDeck.run(id),

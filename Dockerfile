@@ -27,6 +27,13 @@ COPY server.js db.js auth.js email.js convert.js ./
 COPY public ./public
 COPY scripts ./scripts
 
+# run unprivileged: LibreOffice converts untrusted uploads, so don't do it as root.
+# the app only needs to write to presentations/ and data/ (usually bind-mounted;
+# on the host: chown -R 1000:1000 presentations data to match the node user).
+RUN mkdir -p /app/presentations /app/data \
+  && chown -R node:node /app
+USER node
+
 # runtime state lives in volumes:
 #   -v ./presentations:/app/presentations   (slide decks, read-write: uploads land here)
 #   -v ./data:/app/data                     (SQLite: users, sessions, decks)

@@ -152,7 +152,8 @@
       });
       const data = await r.json();
       if (!r.ok) return fail(data.error || 'sign-in failed');
-      location.href = next.startsWith('/') ? next : '/dashboard';
+      const safe = next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\');
+      location.href = safe ? next : '/dashboard';
     });
 
     document.getElementById('use-other').addEventListener('click', () => {

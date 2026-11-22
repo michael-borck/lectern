@@ -24,7 +24,12 @@ function parseCookies(req) {
   if (!header) return out;
   for (const part of header.split(';')) {
     const i = part.indexOf('=');
-    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    if (i <= 0) continue;
+    try {
+      out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    } catch {
+      // ignore malformed percent-encoding — a bad cookie must not crash the request
+    }
   }
   return out;
 }
@@ -76,6 +81,20 @@ function verifyCode(emailAddr, code) {
 // --- rate limiting (in-memory, per key) ---
 
 const buckets = new Map();
+const MAX_BUCKETS = Number(process.env.MAX_RATE_BUCKETS || 50000);
+const MAX_WINDOW_MS = 3600e3;
+
+function prune(now = Date.now()) {
+  for (const [key, times] of buckets) {
+    if (!times.length || times[times.length - 1] <= now - MAX_WINDOW_MS) buckets.delete(key);
+  }
+  for (const key of buckets.keys()) {
+    if (buckets.size <= MAX_BUCKETS) break;
+    buckets.delete(key);
+  }
+}
+setInterval(prune, 60e3).unref();
+
 // hit(key, max, windowMs) -> true if allowed
 function hit(key, max, windowMs) {
   const now = Date.now();
@@ -87,6 +106,7 @@ function hit(key, max, windowMs) {
   }
   arr.push(now);
   buckets.set(key, arr);
+  if (buckets.size > MAX_BUCKETS) prune(now);
   return true;
 }
 
