@@ -84,7 +84,8 @@ LibreOffice converting untrusted files as root is the highest-value target.
 ### L2 — Response headers
 - [x] `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`,
       `X-Frame-Options: DENY` + `frame-ancestors 'none'`.
-- [ ] CSP with nonces/hashes for the inline scripts (follow-up).
+- [x] Strict CSP: inline scripts allowed by SHA-256 hash (login, decks); external
+      scripts by `'self'`; no `script-src 'unsafe-inline'`.
 - [x] HSTS at the proxy (`deploy/Caddyfile`).
 
 ### L3 — Auth & ops hygiene

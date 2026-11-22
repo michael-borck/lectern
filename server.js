@@ -159,12 +159,47 @@ function serveFile(res, base, rel) {
       res.writeHead(404).end('not found');
       return;
     }
-    res.writeHead(200, {
-      'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
+    const ext = path.extname(file).toLowerCase();
+    const headers = {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
       'Cache-Control': 'no-cache',
-    });
+    };
+    if (ext === '.html') {
+      const policy = cspForHtml(data);
+      if (policy) headers['Content-Security-Policy'] = policy;
+    }
+    res.writeHead(200, headers);
     res.end(data);
   });
+}
+
+// Strict page policy: inline <script> blocks are allowed by sha256 hash, so a
+// new or edited inline script needs a matching hash or it won't run.
+function inlineScriptHashes(html) {
+  const hashes = [];
+  const re = /<script\b(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)<\/script\s*>/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    if (!m[1].trim()) continue;
+    hashes.push(`'sha256-${crypto.createHash('sha256').update(m[1], 'utf8').digest('base64')}'`);
+  }
+  return hashes;
+}
+
+function cspForHtml(data) {
+  const scriptSrc = ["'self'", ...inlineScriptHashes(data.toString('utf8'))].join(' ');
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "connect-src 'self' ws: wss:",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; ');
 }
 
 function slideFiles(deck) {
